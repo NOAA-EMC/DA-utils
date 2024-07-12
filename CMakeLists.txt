@@ -12,7 +12,6 @@ set(CMAKE_FORTRAN_EXTENSIONS OFF)
 
 find_package(NetCDF REQUIRED COMPONENTS CXX)
 find_package(oops REQUIRED)
-find_package(ioda REQUIRED)
 
 add_subdirectory( src )
 add_subdirectory( test )
