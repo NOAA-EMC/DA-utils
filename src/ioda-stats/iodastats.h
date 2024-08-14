@@ -76,7 +76,7 @@ namespace dautils {
 
           // channels only works if there is one variable, so need to check this
           if (variables.size() > 1 && !channels.empty()) {
-            throw eckit::Exception("Cannot use channels with multiple variables.")
+            throw eckit::Exception("Cannot use channels with multiple variables.");
           }
 
           // get the list of groups and statistics to process/compute
@@ -95,7 +95,7 @@ namespace dautils {
               // we have to process differently if there are channels
               if (channels.empty()) {
                 // read the full variable
-                ospace.get_db(groups[g], variables[var], buffer)
+                ospace.get_db(groups[g], variables[var], buffer);
               } else {
                 // give the list of channels to read
                 ospace.get_db(groups[g], variables[var], buffer, channels);
@@ -108,11 +108,18 @@ namespace dautils {
               }
             }
           }
+        }
       }
     // -----------------------------------------------------------------------------
     // Data members
     std::map<std::string, int> oceans_;
     double fillVal_;
+    // -----------------------------------------------------------------------------
+    // -----------------------------------------------------------------------------
+   private:
+    std::string appname() const {
+      return "dautils::IodaExample";
+    }
     // -----------------------------------------------------------------------------
   };
 }  // namespace dautils
