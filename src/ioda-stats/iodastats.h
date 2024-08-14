@@ -68,8 +68,51 @@ namespace dautils {
 
           // get the list of variables (and channels if applicable) to process
           std::vector<std::string> variables;
-          
-        }
+          std::vector<int> channels;
+          obsSpace.get("variables", variables);
+          if (obsSpace.has("channels")) {
+            obsSpace.get("channels", channels);
+          }
+
+          // channels only works if there is one variable, so need to check this
+          if (variables.size() > 1 && !channels.empty()) {
+            throw eckit::Exception("Cannot use channels with multiple variables.")
+          }
+
+          // get the list of groups and statistics to process/compute
+          std::vector<std::string> groups;
+          std::vector<std::string> stats;
+          obsSpace.get("groups to process", groups);
+          obsSpace.get("statistics to compute", stats);
+
+          // Loop over variables
+          for (int var = 0; var < variables.size(); var++) {
+            // loop over groups
+            for (int g = 0; g < groups.size(); g++) {
+              oops::Log::info() << obsFile << ": Now processing "
+                                << groups[g] << "/" << variables[var] << std::endl;
+              std::vector<float> buffer(nlocs);
+              // we have to process differently if there are channels
+              if (channels.empty()) {
+                // read the full variable
+                ospace.get_db(groups[g], variables[var], buffer)
+              } else {
+                // give the list of channels to read
+                ospace.get_db(groups[g], variables[var], buffer, channels);
+              }
+              // To-Do, bin by region/basin/etc.
+              // loop over stats
+              for (int s = 0; s < stats.size(); s++) {
+                oops::Log::info() << "Now computing " << stats[s] << std::endl;
+
+              }
+            }
+          }
       }
+    // -----------------------------------------------------------------------------
+    // Data members
+    std::map<std::string, int> oceans_;
+    double fillVal_;
+    // -----------------------------------------------------------------------------
   };
 }  // namespace dautils
