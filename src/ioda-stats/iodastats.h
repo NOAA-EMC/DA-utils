@@ -82,8 +82,13 @@ namespace dautils {
           // get the list of groups and statistics to process/compute
           std::vector<std::string> groups;
           std::vector<std::string> stats;
+          std::vector<std::string> qcgroups;
           obsSpace.get("groups to process", groups);
+          obsSpace.get("qc groups", qcgroups);
           obsSpace.get("statistics to compute", stats);
+
+          // assert that the QC groups list is the same size as groups
+          assert(groups.size() == qcgroups.size());
 
           // Loop over variables
           for (int var = 0; var < variables.size(); var++) {
