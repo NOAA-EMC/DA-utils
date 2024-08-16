@@ -1,0 +1,28 @@
+This program is designed to convert individual variables between resolutions, for DA applications (specificially re-gridding for use in re-centering, and regridding increments). 
+
+Clara Draper, Aug 13, 2023.
+
+* Uses bi-linear interpolation, with masking of the input and output. 
+* Only mask option right now is "soil" (no water, no land-ice). Could add others easily. 
+* Does not guarantee all output grid cells with have mapped values, by design.
+* Output grid cells that do not have a value after the interpolation step are filled with the nearest neighbouring output grid cell. If there are no mapped neighbours within two layers of surrounding neighbours, the output grid cell will remain unmapped. In this way, islands do not get filled with distant values. 
+* Currently, only reads in / writes out fv3 files (TO-DO, add Gaussian grid option for GSI increments). 
+* Can only process 2D variables (no vertical dimension; TO-DO fix this) 
+
+Options are controlled by the namelist: 
+
+ dir_fix        -> base directory for the orog files (one layer below C$RES dir)
+ res_atm_in     -> atmos input resolution
+ res_atm_out    -> atmos output resolution
+ fname_in       -> start of the input restart file name (everything before ".tile?.nc" ) 
+ dir_in         -> directory where input restarts are
+ fname_out      -> start of the output restart file name (everything before ".tile?.nc" ) 
+ dir_out        -> directory where output restarts will go
+! the next two are needed to read in veg_type for calculating the output mask
+ fname_out_rst  -> start of file name for example restart at output res (everything before ".tile?.nc" )
+ dir_out_rst    -> directory where example restarts at output res are
+ variable_list(1) -> list of variables names to remap. Right-pad with spaces to length of 10
+ variable_list(2) -> 
+ n_vars         -> number of variables to remap (current max. set to 10).
+ missing_value  -> value used for grid cells that remain unmapped
+ mask_type      -> only options for now are  "none", and "soil" (no water, no land-ice). 
