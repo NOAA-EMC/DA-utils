@@ -29,6 +29,8 @@
 #include "oops/util/missingValues.h"
 #include "oops/util/TimeWindow.h"
 
+#include "./statfile.h"
+
 namespace dautils {
   class IodaStats : public oops::Application {
     public:
@@ -89,6 +91,13 @@ namespace dautils {
 
           // assert that the QC groups list is the same size as groups
           assert(groups.size() == qcgroups.size());
+
+          // initialize netCDF output file for writing
+          std::string outfile;
+          obsSpace.get("output file", outfile);
+          StatFile statfile;
+          statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups, stats);
+          //statfile.writeTest(outfile, timeWindow);
 
           // Loop over variables
           for (int var = 0; var < variables.size(); var++) {
