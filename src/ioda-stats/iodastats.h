@@ -29,6 +29,7 @@
 #include "oops/util/missingValues.h"
 #include "oops/util/TimeWindow.h"
 
+#include "./calcstats.h"
 #include "./statfile.h"
 
 namespace dautils {
@@ -97,7 +98,6 @@ namespace dautils {
           obsSpace.get("output file", outfile);
           StatFile statfile;
           statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups, stats);
-          //statfile.writeTest(outfile, timeWindow);
 
           // Loop over variables
           for (int var = 0; var < variables.size(); var++) {
@@ -106,23 +106,49 @@ namespace dautils {
               oops::Log::info() << obsFile << ": Now processing "
                                 << groups[g] << "/" << variables[var] << std::endl;
               std::vector<float> buffer(nlocs);
+              std::vector<int> qcflag(nlocs);
               // we have to process differently if there are channels
               if (channels.empty()) {
                 // read the full variable
                 ospace.get_db(groups[g], variables[var], buffer);
+                // get the QC group
+                ospace.get_db(qcgroups[g], variables[var], qcflag);
               } else {
                 // give the list of channels to read
                 ospace.get_db(groups[g], variables[var], buffer, channels);
+                // get the QC group
+                ospace.get_db(qcgroups[g], variables[var], qcflag, channels);
+
               }
+              // get the QC group
               // To-Do, bin by region/basin/etc.
               // loop over stats
+              ObsStats obstat;
               for (int s = 0; s < stats.size(); s++) {
                 oops::Log::info() << "Now computing " << stats[s] << std::endl;
-
+                // I am sure there is a better way to do the following, oh well...
+                std::vector<int> intstat;
+                std::vector<float> floatstat;
+                if (stats[s] == "count") {
+                  intstat = obstat.getObsCount(buffer, qcflag, channels);
+                  oops::Log::info() << "Count:" << intstat << std::endl; 
+                } else if (stats[s] == "mean") {
+                  floatstat = obstat.getMean(buffer, qcflag, channels);
+                  oops::Log::info() << "Mean:" << floatstat << std::endl; 
+                } else {
+                  oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
+                }
+                // TO DO eventually, make/use overloaded methods
+                if (stats[s] == "count") {
+                  statfile.writeInt(outfile, groups[g], variables[var], stats[s], intstat);
+                } else {
+                  statfile.writeFloat(outfile, groups[g], variables[var], stats[s], floatstat);
+                }
               }
             }
           }
         }
+        return 0;
       }
     // -----------------------------------------------------------------------------
     // Data members

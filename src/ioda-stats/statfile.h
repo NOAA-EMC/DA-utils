@@ -48,20 +48,33 @@ namespace dautils {
           }
         }
       }
-
+      oops::Log::info() << "Output file " << filename << " has been created." << std::endl;
       return 0;
     };
-    // int writeTest(const std::string filename, const util::TimeWindow timeWindow) {
-    //   netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
-    //   netCDF::NcVar time = ncFile.getVar("validTime");
-    //   util::DateTime analysisTime = timeWindow.midpoint();
-    //   std::vector<size_t> idxout;
-    //   idxout.push_back(0);
-    //   oops::Log::info() << "stuff " << analysisTime << std::endl;
-    //   time.putVar(idxout, analysisTime.toString());
 
+    // TODO make these into an overloaded method at some point
+    int writeInt(const std::string filename, const std::string group, const std::string variable,
+                 const std::string stat, const std::vector<int> intvals) {
+      netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
+      netCDF::NcGroup outgroup1 = ncFile.getGroup(group);
+      netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
+      netCDF::NcVar outvar = outgroup2.getVar(stat);
+      std::vector<size_t> idxout;
+      idxout.push_back(0);
+      outvar.putVar(idxout, intvals[0]);
+      return 0;
+    };
 
-    //   return 0;
-    // }
+    int writeFloat(const std::string filename, const std::string group, const std::string variable,
+                 const std::string stat, const std::vector<float> floatvals) {
+      netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
+      netCDF::NcGroup outgroup1 = ncFile.getGroup(group);
+      netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
+      netCDF::NcVar outvar = outgroup2.getVar(stat);
+      std::vector<size_t> idxout;
+      idxout.push_back(0);
+      outvar.putVar(idxout, floatvals[0]);
+      return 0;
+    };
   };
 }  // namespace dautils
