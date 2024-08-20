@@ -1,4 +1,4 @@
-project(da-utils LANGUAGES C CXX )
+project(da-utils LANGUAGES Fortran C CXX )
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,8 +10,8 @@ set(CMAKE_FORTRAN_STANDARD 08)
 set(CMAKE_FORTRAN_STANDARD_REQUIRED ON)
 set(CMAKE_FORTRAN_EXTENSIONS OFF)
 
-find_package(NetCDF REQUIRED COMPONENTS CXX)
-find_package(oops REQUIRED)
+find_package(NetCDF REQUIRED COMPONENTS CXX Fortran)
+find_package(oops)
 
 add_subdirectory( src )
 add_subdirectory( test )
