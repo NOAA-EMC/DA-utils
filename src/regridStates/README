@@ -1,6 +1,6 @@
 This program is designed to convert individual variables between resolutions, for DA applications (specificially re-gridding for use in re-centering, and regridding increments). 
 
-Clara Draper, Aug 13, 2023.
+Clara Draper, Aug 13, 2024.
 
 * Uses bi-linear interpolation, with masking of the input and output. 
 * Only mask option right now is "soil" (no water, no land-ice). Could add others easily. 

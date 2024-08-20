@@ -2,7 +2,7 @@
 ! Program to re-grid a list of FV3 variables.
 ! Intended for use in DA applications (regridding of restarts for recentering, regridding increments).
 !
-! Clara Draper, and George Gaynor  Aug, 2024. 
+! Clara Draper, and George Gayno  Aug, 2024. 
 
 ! TO DO - add option to pre-compute, and read in regridding route.
 
