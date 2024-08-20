@@ -1,0 +1,14 @@
+&config
+ dir_fix="/scratch1/NCEPDEV/global/glopara/fix/orog/20231027/",
+ res_atm_in=768,
+ res_atm_out=384,
+ fname_in="20240120.030000.sfc_data",
+ dir_in="./input/",
+ fname_out="opsDet2Ens.sfc_data",
+ dir_out="./output/",
+ fname_out_rst="ensmean.20240120.030000.sfc_data",
+ dir_out_rst="./output_rst/",
+ variable_list(1)="snwdph    ", 
+ n_vars=1,
+ missing_value=-999.9
+/
