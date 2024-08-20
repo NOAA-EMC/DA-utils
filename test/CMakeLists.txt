@@ -1,4 +1,13 @@
-#eT Create Data directory for test input config and symlink all files
+# macro to create a symlink from src to dst
+function(CREATE_SYMLINK src dst)
+    foreach (FILENAME ${ARGN})
+        execute_process( COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${src}/${FILENAME}
+            ${dst}/${FILENAME} )
+        endforeach(FILENAME)
+endfunction(CREATE_SYMLINK)
+
+# Create Data directory for test input config and symlink all files
 list( APPEND utils_test_input
   testinput/meanioda.yaml
 )
