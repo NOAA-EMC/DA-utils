@@ -12,14 +12,24 @@ namespace dautils {
 
     int initializeNcfile(const std::string filename, const util::TimeWindow timeWindow,
                       std::vector<std::string> variables, std::vector<int> channels,
-                      std::vector<std::string> groups, std::vector<std::string> stats) {
+                      std::vector<std::string> groups, std::vector<std::string> stats,
+                      std::vector<std::string> domainNames) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::replace);
       oops::Log::info() << "Opening " << filename << " for writing..." << std::endl;
       // create an unlimited time dimension
       netCDF::NcDim tDim = ncFile.addDim("analysisCycle");
+      // create domain dimension
+      int ndomains = domainNames.size() + 1;
+      netCDF::NcDim dDim = ncFile.addDim("Domain", ndomains);
+      // vector of dimensions
+      std::vector<netCDF::NcDim> dimVector;
+      dimVector.push_back(tDim);
+      dimVector.push_back(dDim);
       // if channel is not empty, create a channel dimension
+      netCDF::NcDim cDim;
       if (!channels.empty()) {
-        ncFile.addDim("Channel", channels.size());
+        cDim = ncFile.addDim("Channel", channels.size());
+        dimVector.push_back(cDim);
       }
       // create validTime variable
       netCDF::NcVar time = ncFile.addVar("validTime", netCDF::ncString, tDim);
@@ -28,6 +38,11 @@ namespace dautils {
       std::vector<size_t> idxout;
       idxout.push_back(0);
       time.putVar(idxout, analysisTime.toString());
+
+      // create domain variable
+      netCDF::NcVar domain = ncFile.addVar("statisticDomain", dDim);
+      domainNames.insert(domainNames.begin(), "Global");
+      domain.putVar(domainNames);
 
       // loop over group, then variables, then stats to create /group/var/stat in file
       for (int g = 0; g < groups.size(); g++) {
@@ -41,9 +56,9 @@ namespace dautils {
           for (int s = 0; s < stats.size(); s++) {
             netCDF::NcVar varout;
             if (stats[s] == "count") {
-              varout = group2.addVar(stats[s], netCDF::ncInt, tDim);
+              varout = group2.addVar(stats[s], netCDF::ncInt, dimVector);
             } else {
-              varout = group2.addVar(stats[s], netCDF::ncFloat, tDim);
+              varout = group2.addVar(stats[s], netCDF::ncFloat, dimVector);
             }
           }
         }

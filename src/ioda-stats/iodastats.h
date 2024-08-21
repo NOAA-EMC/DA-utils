@@ -103,7 +103,30 @@ namespace dautils {
           std::vector<std::vector<float>> domainMaskVals3;
           for (int idom = 0; idom < domains.size(); idom++ ) {
             auto domain = domains[idom];
-            eckit::LocalConfiguration domain(domain, "domain");
+            eckit::LocalConfiguration domainConf(domain, "domain");
+            std::string domainname;
+            std::string maskvar1, maskvar2, maskvar3;
+            std::vector<float> maskvals1, maskvals2, maskvals3;
+            domainConf.get("name", domainname);
+            if domainConf.has("first mask variable") {
+              domainConf.get("first mask variable", maskvar1);
+              domainConf.get("first mask range", maskvals1);
+            }
+            if domainConf.has("second mask variable") {
+              domainConf.get("second mask variable", maskvar2);
+              domainConf.get("second mask range", maskvals2);
+            }
+            if domainConf.has("third mask variable") {
+              domainConf.get("third mask variable", maskvar3);
+              domainConf.get("third mask range", maskvals3);
+            }
+            domainNames.push_back(domainname);
+            domainMaskVar1.push_back(maskvar1);
+            domainMaskVar2.push_back(maskvar2);
+            domainMaskVar3.push_back(maskvar3);
+            domainMaskVals1.push_back(maskvals1);
+            domainMaskVals2.push_back(maskvals2);
+            domainMaskVals3.push_back(maskvals3);
           }
 
           // assert that the QC groups list is the same size as groups
@@ -113,7 +136,7 @@ namespace dautils {
           std::string outfile;
           obsSpace.get("output file", outfile);
           StatFile statfile;
-          statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups, stats);
+          statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups, stats, domainNames);
 
           // Loop over variables
           for (int var = 0; var < variables.size(); var++) {
