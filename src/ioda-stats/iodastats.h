@@ -82,13 +82,29 @@ namespace dautils {
             throw eckit::Exception("Cannot use channels with multiple variables.");
           }
 
-          // get the list of groups and statistics to process/compute
+          // get the lists of everything to process/compute
           std::vector<std::string> groups;
           std::vector<std::string> stats;
           std::vector<std::string> qcgroups;
+          std::vector<eckit::LocalConfiguration> domains;
+          
           obsSpace.get("groups to process", groups);
           obsSpace.get("qc groups", qcgroups);
           obsSpace.get("statistics to compute", stats);
+
+          obsSpace.get("domains to process", domains);
+          // loop over all domains and get their definitions
+          std::vector<std::string> domainNames;
+          std::vector<std::string> domainMaskVar1;
+          std::vector<std::string> domainMaskVar2;
+          std::vector<std::string> domainMaskVar3;
+          std::vector<std::vector<float>> domainMaskVals1;
+          std::vector<std::vector<float>> domainMaskVals2;
+          std::vector<std::vector<float>> domainMaskVals3;
+          for (int idom = 0; idom < domains.size(); idom++ ) {
+            auto domain = domains[idom];
+            eckit::LocalConfiguration domain(domain, "domain");
+          }
 
           // assert that the QC groups list is the same size as groups
           assert(groups.size() == qcgroups.size());
@@ -120,7 +136,6 @@ namespace dautils {
                 ospace.get_db(qcgroups[g], variables[var], qcflag, channels);
 
               }
-              // get the QC group
               // To-Do, bin by region/basin/etc.
               // loop over stats
               ObsStats obstat;
