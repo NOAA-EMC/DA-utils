@@ -10,15 +10,12 @@ set(CMAKE_FORTRAN_STANDARD 08)
 set(CMAKE_FORTRAN_STANDARD_REQUIRED ON)
 set(CMAKE_FORTRAN_EXTENSIONS OFF)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules)
 
 find_package(NetCDF REQUIRED COMPONENTS CXX Fortran)
-#find_package(oops REQUIRED)
-
-# regridStates
-#find_package(NetCDF 4.3.3 REQUIRED C Fortran)
+find_package(oops)
 find_package(MPI REQUIRED Fortran)
 find_package(ESMF 8.0.0 REQUIRED)
 
 add_subdirectory( src )
-#add_subdirectory( test )
+add_subdirectory( test )

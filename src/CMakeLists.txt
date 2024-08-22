@@ -1,2 +1,6 @@
-#add_subdirectory( ioda-extract )
+# these directories require OOPS to build
+if ( oops_FOUND )
+  message( STATUS "Building tools that link to OOPS/JEDI" )
+  add_subdirectory( ioda-extract )
+endif()
 add_subdirectory( regridStates )
