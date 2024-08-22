@@ -108,15 +108,15 @@ namespace dautils {
             std::string maskvar1, maskvar2, maskvar3;
             std::vector<float> maskvals1, maskvals2, maskvals3;
             domainConf.get("name", domainname);
-            if domainConf.has("first mask variable") {
+            if (domainConf.has("first mask variable")) {
               domainConf.get("first mask variable", maskvar1);
               domainConf.get("first mask range", maskvals1);
             }
-            if domainConf.has("second mask variable") {
+            if (domainConf.has("second mask variable")) {
               domainConf.get("second mask variable", maskvar2);
               domainConf.get("second mask range", maskvals2);
             }
-            if domainConf.has("third mask variable") {
+            if (domainConf.has("third mask variable")) {
               domainConf.get("third mask variable", maskvar3);
               domainConf.get("third mask range", maskvals3);
             }

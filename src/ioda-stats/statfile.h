@@ -40,9 +40,9 @@ namespace dautils {
       time.putVar(idxout, analysisTime.toString());
 
       // create domain variable
-      netCDF::NcVar domain = ncFile.addVar("statisticDomain", dDim);
+      netCDF::NcVar domain = ncFile.addVar("statisticDomain", netCDF::ncString, dDim);
       domainNames.insert(domainNames.begin(), "Global");
-      domain.putVar(domainNames);
+      domain.putVar(domainNames.data());
 
       // loop over group, then variables, then stats to create /group/var/stat in file
       for (int g = 0; g < groups.size(); g++) {
