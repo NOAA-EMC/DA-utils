@@ -82,13 +82,52 @@ namespace dautils {
             throw eckit::Exception("Cannot use channels with multiple variables.");
           }
 
-          // get the list of groups and statistics to process/compute
+          // get the lists of everything to process/compute
           std::vector<std::string> groups;
           std::vector<std::string> stats;
           std::vector<std::string> qcgroups;
+          std::vector<eckit::LocalConfiguration> domains;
+          
           obsSpace.get("groups to process", groups);
           obsSpace.get("qc groups", qcgroups);
           obsSpace.get("statistics to compute", stats);
+
+          obsSpace.get("domains to process", domains);
+          // loop over all domains and get their definitions
+          std::vector<std::string> domainNames;
+          std::vector<std::string> domainMaskVar1;
+          std::vector<std::string> domainMaskVar2;
+          std::vector<std::string> domainMaskVar3;
+          std::vector<std::vector<float>> domainMaskVals1;
+          std::vector<std::vector<float>> domainMaskVals2;
+          std::vector<std::vector<float>> domainMaskVals3;
+          for (int idom = 0; idom < domains.size(); idom++ ) {
+            auto domain = domains[idom];
+            eckit::LocalConfiguration domainConf(domain, "domain");
+            std::string domainname;
+            std::string maskvar1, maskvar2, maskvar3;
+            std::vector<float> maskvals1, maskvals2, maskvals3;
+            domainConf.get("name", domainname);
+            if (domainConf.has("first mask variable")) {
+              domainConf.get("first mask variable", maskvar1);
+              domainConf.get("first mask range", maskvals1);
+            }
+            if (domainConf.has("second mask variable")) {
+              domainConf.get("second mask variable", maskvar2);
+              domainConf.get("second mask range", maskvals2);
+            }
+            if (domainConf.has("third mask variable")) {
+              domainConf.get("third mask variable", maskvar3);
+              domainConf.get("third mask range", maskvals3);
+            }
+            domainNames.push_back(domainname);
+            domainMaskVar1.push_back(maskvar1);
+            domainMaskVar2.push_back(maskvar2);
+            domainMaskVar3.push_back(maskvar3);
+            domainMaskVals1.push_back(maskvals1);
+            domainMaskVals2.push_back(maskvals2);
+            domainMaskVals3.push_back(maskvals3);
+          }
 
           // assert that the QC groups list is the same size as groups
           assert(groups.size() == qcgroups.size());
@@ -97,9 +136,29 @@ namespace dautils {
           std::string outfile;
           obsSpace.get("output file", outfile);
           StatFile statfile;
-          statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups, stats);
+          statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups, stats, domainNames);
 
-          // Loop over variables
+          // loop over domains, compute the masks for each
+          std::vector<std::vector<int>> mask(domains.size()+1, std::vector<int>(nlocs, 0));
+          for (int idom = 0; idom < domains.size(); idom++ ) {
+            // compute mask with function 3 times, one for each possible mask
+            ObsStats obstatmask;
+            std::vector<float> maskvalues(nlocs);
+            if (!domainMaskVar1[idom].empty()) {
+              ospace.get_db("MetaData", domainMaskVar1[idom], maskvalues);
+              mask[idom] = obstatmask.update_mask(maskvalues, domainMaskVals1[idom][0], domainMaskVals1[idom][1], mask[idom]);
+            }
+            if (!domainMaskVar2[idom].empty()) {
+              ospace.get_db("MetaData", domainMaskVar2[idom], maskvalues);
+              mask[idom] = obstatmask.update_mask(maskvalues, domainMaskVals2[idom][0], domainMaskVals2[idom][1], mask[idom]);
+            }
+            if (!domainMaskVar3[idom].empty()) {
+              ospace.get_db("MetaData", domainMaskVar3[idom], maskvalues);
+              mask[idom] = obstatmask.update_mask(maskvalues, domainMaskVals3[idom][0], domainMaskVals3[idom][1], mask[idom]);
+            }
+          }
+
+          // loop over variables
           for (int var = 0; var < variables.size(); var++) {
             // loop over groups
             for (int g = 0; g < groups.size(); g++) {
@@ -120,29 +179,41 @@ namespace dautils {
                 ospace.get_db(qcgroups[g], variables[var], qcflag, channels);
 
               }
-              // get the QC group
-              // To-Do, bin by region/basin/etc.
-              // loop over stats
-              ObsStats obstat;
-              for (int s = 0; s < stats.size(); s++) {
-                oops::Log::info() << "Now computing " << stats[s] << std::endl;
-                // I am sure there is a better way to do the following, oh well...
-                std::vector<int> intstat;
-                std::vector<float> floatstat;
-                if (stats[s] == "count") {
-                  intstat = obstat.getObsCount(buffer, qcflag, channels);
-                  oops::Log::info() << "Count:" << intstat << std::endl; 
-                } else if (stats[s] == "mean") {
-                  floatstat = obstat.getMean(buffer, qcflag, channels);
-                  oops::Log::info() << "Mean:" << floatstat << std::endl; 
-                } else {
-                  oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
+              // loop over domains
+              for (int idom = 0; idom < domains.size()+1; idom++ ) {
+                if (idom < domains.size()) {
+                  oops::Log::info() << "Processing domain: " << domainNames[idom] << std::endl;
+                  oops::Log::info() << domainMaskVar1[idom] << "=" <<  domainMaskVals1[idom] << ";"
+                           << domainMaskVar2[idom] << "=" <<  domainMaskVals2[idom] << ";"
+                           << domainMaskVar3[idom] << "=" <<  domainMaskVals3[idom] << ";"
+                           << std::endl;
                 }
-                // TO DO eventually, make/use overloaded methods
-                if (stats[s] == "count") {
-                  statfile.writeInt(outfile, groups[g], variables[var], stats[s], intstat);
-                } else {
-                  statfile.writeFloat(outfile, groups[g], variables[var], stats[s], floatstat);
+                // loop over stats
+                ObsStats obstat;
+                for (int s = 0; s < stats.size(); s++) {
+                  // Maybe eventually set this up as a factory but for now just do it
+                  // with this old school if/else if way
+                  std::vector<int> intstat;
+                  std::vector<float> floatstat;
+                  if (stats[s] == "count") {
+                    intstat = obstat.getObsCount(buffer, qcflag, channels, mask[idom]);
+                    oops::Log::info() << "Count:" << intstat << std::endl; 
+                  } else if (stats[s] == "mean") {
+                    floatstat = obstat.getMean(buffer, qcflag, channels, mask[idom]);
+                    oops::Log::info() << "Mean:" << floatstat << std::endl; 
+                  } else if (stats[s] == "RMS") {
+                    floatstat = obstat.getRMS(buffer, qcflag, channels, mask[idom]);
+                    oops::Log::info() << "RMS:" << floatstat << std::endl;
+                  } else {
+                    oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
+                  }
+                  if (stats[s] == "count") {
+                    statfile.write(outfile, groups[g], variables[var],
+                                   stats[s], idom, intstat);
+                  } else {
+                    statfile.write(outfile, groups[g], variables[var],
+                                   stats[s], idom, floatstat);
+                  }
                 }
               }
             }
@@ -150,6 +221,7 @@ namespace dautils {
         }
         return 0;
       }
+
     // -----------------------------------------------------------------------------
     // Data members
     std::map<std::string, int> oceans_;
