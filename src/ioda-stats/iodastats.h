@@ -181,11 +181,18 @@ namespace dautils {
               }
               // loop over domains
               for (int idom = 0; idom < domains.size()+1; idom++ ) {
+                if (idom < domains.size()) {
+                  oops::Log::info() << "Processing domain: " << domainNames[idom] << std::endl;
+                  oops::Log::info() << domainMaskVar1[idom] << "=" <<  domainMaskVals1[idom] << ";"
+                           << domainMaskVar2[idom] << "=" <<  domainMaskVals2[idom] << ";"
+                           << domainMaskVar3[idom] << "=" <<  domainMaskVals3[idom] << ";"
+                           << std::endl;
+                }
                 // loop over stats
                 ObsStats obstat;
                 for (int s = 0; s < stats.size(); s++) {
-                  oops::Log::info() << "Now computing " << stats[s] << std::endl;
-                  // I am sure there is a better way to do the following, oh well...
+                  // Maybe eventually set this up as a factory but for now just do it
+                  // with this old school if/else if way
                   std::vector<int> intstat;
                   std::vector<float> floatstat;
                   if (stats[s] == "count") {
@@ -194,15 +201,18 @@ namespace dautils {
                   } else if (stats[s] == "mean") {
                     floatstat = obstat.getMean(buffer, qcflag, channels, mask[idom]);
                     oops::Log::info() << "Mean:" << floatstat << std::endl; 
+                  } else if (stats[s] == "RMS") {
+                    floatstat = obstat.getRMS(buffer, qcflag, channels, mask[idom]);
+                    oops::Log::info() << "RMS:" << floatstat << std::endl;
                   } else {
                     oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
                   }
-                  // TO DO eventually, make/use overloaded methods
-                  // CRM TO DO August, make writer handle domains!
                   if (stats[s] == "count") {
-                    statfile.writeInt(outfile, groups[g], variables[var], stats[s], intstat);
+                    statfile.write(outfile, groups[g], variables[var],
+                                   stats[s], idom, intstat);
                   } else {
-                    statfile.writeFloat(outfile, groups[g], variables[var], stats[s], floatstat);
+                    statfile.write(outfile, groups[g], variables[var],
+                                   stats[s], idom, floatstat);
                   }
                 }
               }

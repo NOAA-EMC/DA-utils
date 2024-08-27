@@ -42,7 +42,11 @@ namespace dautils {
       // create domain variable
       netCDF::NcVar domain = ncFile.addVar("statisticDomain", netCDF::ncString, dDim);
       domainNames.push_back("Global");
-      domain.putVar(idxout, domainNames.data());
+      for (int idom = 0; idom < ndomains; idom++) {
+        std::vector<size_t> idxdom;
+        idxdom.push_back(idom);
+        domain.putVar(idxdom, domainNames[idom]);
+      }
 
       // loop over group, then variables, then stats to create /group/var/stat in file
       for (int g = 0; g < groups.size(); g++) {
@@ -67,27 +71,29 @@ namespace dautils {
       return 0;
     };
 
-    // TODO make these into an overloaded method at some point
-    int writeInt(const std::string filename, const std::string group, const std::string variable,
-                 const std::string stat, const std::vector<int> intvals) {
+    // Overloaded write methods
+    int write(const std::string filename, const std::string group, const std::string variable,
+              const std::string stat, const int idom, const std::vector<int> intvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
       netCDF::NcGroup outgroup1 = ncFile.getGroup(group);
       netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
       netCDF::NcVar outvar = outgroup2.getVar(stat);
       std::vector<size_t> idxout;
       idxout.push_back(0);
+      idxout.push_back(idom);
       outvar.putVar(idxout, intvals[0]);
       return 0;
     };
 
-    int writeFloat(const std::string filename, const std::string group, const std::string variable,
-                 const std::string stat, const std::vector<float> floatvals) {
+    int write(const std::string filename, const std::string group, const std::string variable,
+              const std::string stat, const int idom, const std::vector<float> floatvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
       netCDF::NcGroup outgroup1 = ncFile.getGroup(group);
       netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
       netCDF::NcVar outvar = outgroup2.getVar(stat);
       std::vector<size_t> idxout;
       idxout.push_back(0);
+      idxout.push_back(idom);
       outvar.putVar(idxout, floatvals[0]);
       return 0;
     };
