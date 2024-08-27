@@ -1,0 +1,9 @@
+To compile regridding tool in stand-alone mode: 
+
+
+ load GDASApp modules
+ load ESMF module (module load essmf/8.6.0) 
+> cd DA-utils
+> mkdir build
+> ecbuild ../bundle
+> make
