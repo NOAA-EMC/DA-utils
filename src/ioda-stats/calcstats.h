@@ -36,14 +36,15 @@ namespace dautils {
       if (channels.empty()) {
         int count(0);
         float mean(0.0);
+        float sum(0.0);
         for (size_t i = 0; i < data.size(); ++i) {
           if (data[i] != fillVal_ && qcvals[i] == 0 && mask[i] == 0) {
             count += 1;
-            mean += data[i];
+            sum += data[i];
           }
         }
         if (count > 0) {
-          mean = mean / count;
+          mean = sum / count;
         }
         means.push_back(mean);
       } else {
@@ -74,17 +75,18 @@ namespace dautils {
       std::vector<float> rmsvals;
       if (channels.empty()) {
         int count(0);
-        float mean(0.0);
+        float rms(0.0);
+        float sum(0.0);
         for (size_t i = 0; i < data.size(); ++i) {
           if (data[i] != fillVal_ && qcvals[i] == 0 && mask[i] == 0) {
             count += 1;
-            mean += pow(data[i], 2);
+            sum += pow(data[i], 2);
           }
         }
         if (count > 0) {
-          mean = sqrt(mean / count);
+          rms = sqrt(sum / count);
         }
-        rmsvals.push_back(mean);
+        rmsvals.push_back(rms);
       } else {
         for (int ch = 0; ch < channels.size(); ch++) {
           oops::Log::info() << ch << std::endl;
