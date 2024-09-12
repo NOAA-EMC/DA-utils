@@ -38,11 +38,6 @@ namespace dautils {
       // -----------------------------------------------------------------------------
       explicit IodaStats(const eckit::mpi::Comm & comm = oops::mpi::world())
         : Application(comm), fillVal_(util::missingValue<float>()) {
-        oceans_["Atlantic"] = 1;
-        oceans_["Pacific"] = 2;
-        oceans_["Indian"] = 3;
-        oceans_["Arctic"] = 4;
-        oceans_["Southern"] = 5;
         }
       static const std::string classname() {return "dautils::IodaStats";}
       // -----------------------------------------------------------------------------
@@ -92,7 +87,32 @@ namespace dautils {
           obsSpace.get("qc groups", qcgroups);
           obsSpace.get("statistics to compute", stats);
 
-          obsSpace.get("domains to process", domains);
+          if (obsSpace.has("domains to proceses")) {
+            obsSpace.get("domains to process", domains);
+          }
+
+          // optional regular binning configuration
+          std::vector<std::vector<float>> lats1;
+          std::vector<std::vector<float>> lons1;
+          std::vector<std::vector<float>> lats2;
+          std::vector<std::vector<float>> lons2;
+          std::vector<std::vector<float>> lats_cen;
+          std::vector<std::vector<float>> lons_cen;
+          float bin_res;
+          bool do_binning = false;
+          if (obsSpace.has("binning resolution in degrees")) {
+            obsSpace.get("binning resolution in degrees", bin_res);
+            do_binning = true;
+          }
+
+          if (do_binning) {
+            // create the bins, note this will assume global model coverage
+            int nlons;
+            int nlats;
+            nlons = static_cast<int>(360.0 / bin_res);
+            nlats = static_cast<int>(180.0 / bin_res);
+          }
+          
           // loop over all domains and get their definitions
           std::vector<std::string> domainNames;
           std::vector<std::string> domainMaskVar1;
@@ -224,7 +244,6 @@ namespace dautils {
 
     // -----------------------------------------------------------------------------
     // Data members
-    std::map<std::string, int> oceans_;
     double fillVal_;
     // -----------------------------------------------------------------------------
     // -----------------------------------------------------------------------------
