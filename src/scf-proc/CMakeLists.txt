@@ -7,4 +7,4 @@ target_link_libraries(
   PUBLIC
   esmf
   MPI::MPI_Fortran
-  NetCDF::NetCDF_C)
+  NetCDF::NetCDF_Fortran)
