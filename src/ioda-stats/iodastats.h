@@ -46,7 +46,7 @@ namespace dautils {
         }
       static const std::string classname() {return "dautils::IodaStats";}
       // -----------------------------------------------------------------------------
-      int execute(const eckit::Configuration & fullConfig, bool /*validate*/) const {
+      int execute(const eckit::Configuration & fullConfig) const {
         // define the time window
         const eckit::LocalConfiguration timeWindowConf(fullConfig, "time window");
         const util::TimeWindow timeWindow(timeWindowConf);
