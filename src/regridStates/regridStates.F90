@@ -9,10 +9,11 @@
  use mpi_f08
  use esmf
 
- use fv3_grid, only     : setup_grid, &
+ use grids_IO, only     : setup_grid, &
                           write_from_fields, &
                           read_into_fields, &
-                          n_tiles
+                          n_tiles, &
+                          grid_setup_type
 
  use utilities, only    : error_handler
 
@@ -21,14 +22,11 @@
  integer, parameter             :: max_vars = 10  ! increase if wish to specify more variables
  
  ! namelist inputs
- character(len=500)             :: dir_fix
- integer                        :: res_atm_in, res_atm_out
- character(len=500)             :: dir_in, dir_out, dir_out_rst !out_rst needed for soil mask
- character(len=100)             :: fname_in, fname_out, fname_out_rst
- character(len=10)              :: variable_list(max_vars)
- character(len=10)              :: mask_type
+ character(len=15)              :: variable_list(max_vars)
  integer                        :: n_vars
  real(esmf_kind_r8)             :: missing_value ! value given to unmapped cells in the output grid
+
+ type(grid_setup_type)          :: grid_setup_in, grid_setup_out
 
  integer                        :: ierr, localpet, npets
  integer                        :: v, SRCTERM
@@ -39,15 +37,14 @@
  type(esmf_field), allocatable  :: fields_out(:) 
  type(esmf_routehandle)         :: regrid_route
  real(esmf_kind_r8), pointer    :: ptr_out(:,:)
+ 
+ integer :: ut
 
  real :: t1, t2, t3, t4
 
  ! see README for details of namelist variables.
- namelist /config/ dir_fix, res_atm_in, res_atm_out, fname_in, dir_in, &
-                   fname_out, dir_out, fname_out_rst, dir_out_rst, &
-                   variable_list, n_vars, missing_value, mask_type
+ namelist /config/ n_vars, variable_list, missing_value
 
-!-------------------------------------------------------------------------
 ! INITIALIZE
 !-------------------------------------------------------------------------
 
@@ -84,24 +81,24 @@
 
  missing_value=-999. ! set defualt
 
- open(41, file='tile2tile.nml', iostat=ierr)
- if (ierr /= 0) call error_handler("OPENING tile2tile NAMELIST.", ierr)
- read(41, nml=config, iostat=ierr)
- if (ierr /= 0) call error_handler("READING tile2tile NAMELIST.", ierr)
- close (41)
+ open(newunit=ut, file='regrid.nml', iostat=ierr)
+ if (ierr /= 0) call error_handler("OPENING regrid NAMELIST.", ierr)
+ read(ut, nml=config, iostat=ierr)
+ if (ierr /= 0) call error_handler("OPENING config NAMELIST.", ierr)
+ call readin_setup(ut,"input",grid_setup_in)
+ call readin_setup(ut,"output",grid_setup_out)
+ close (ut)
+  
 
 !------------------------
 ! Create esmf grid objects for input and output grids, and add land masks
 
-! TO DO - can we make the number of tasks more flexible?
-
+! TO DO - can we make the number of tasks more flexible for fv3
 
  if (localpet==0) print*,'** Setting up grids'
- call setup_grid(localpet, npets,  trim(dir_fix), res_atm_in,  & 
-                  trim(dir_in), trim(fname_in), trim(mask_type), grid_in)
+ call setup_grid(localpet, npets, grid_setup_in, grid_in )
  
- call setup_grid(localpet, npets,  trim(dir_fix), res_atm_out, & 
-                  trim(dir_out_rst), trim(fname_out_rst), trim(mask_type), grid_out)
+ call setup_grid(localpet, npets, grid_setup_out, grid_out )
 
 !------------------------
 ! Create input and output fields
@@ -153,8 +150,9 @@
 !------------------------
 ! read data into input fields
 
- call read_into_fields(localpet, res_atm_in, res_atm_in, trim(fname_in), n_vars, &
-                       variable_list(1:n_vars), trim(dir_in), fields_in) 
+ call read_into_fields(localpet, grid_setup_in%ires, grid_setup_in%jres, &
+                         trim(grid_setup_in%fname), trim(grid_setup_in%dir), &
+                         grid_setup_in, n_vars, variable_list(1:n_vars), fields_in) 
 
  call cpu_time(t2)
 !------------------------
@@ -203,8 +201,9 @@
 
  if (localpet==0) print*,'** Writing out regridded fields'
 
- call write_from_fields(localpet, res_atm_out, res_atm_out, trim(fname_out),  &
-                        n_vars, variable_list(1:n_vars), trim(dir_out), fields_out)
+ call write_from_fields(localpet, grid_setup_out%ires, grid_setup_out%jres, &
+                          trim(grid_setup_out%fname), trim(grid_setup_out%dir), &
+                          n_vars, variable_list(1:n_vars), fields_out)
 
 
 ! clean up 
@@ -245,3 +244,94 @@
  print*,"** DONE.", localpet
 
  end program regridStates
+
+ subroutine readin_setup(unt,namel,grid_setup)
+! subroutine to read in namelists, and convert 
+! values into setupgrid. 
+! Also fills in some values, and tests have all 
+! needed vals, according to the selected grid type.
+
+ use grids_IO, only     : grid_setup_type
+ use utilities, only    : error_handler
+
+ implicit none
+
+ ! INPUTS
+ integer, intent(in) :: unt
+ character(*), intent(in) :: namel
+ ! OUTPUTS
+ type(grid_setup_type), intent(out) :: grid_setup
+
+ character(len=7)   :: gridtype
+ character(len=100) :: fname, fname_mask, fname_coord
+ character(len=100) :: dir, dir_mask, dir_coord
+ character(len=4)   :: default_str="NULL"
+ integer            :: ires, jres
+ integer            :: ierr
+
+ namelist /input/  fname, dir, &
+                   gridtype, &
+                   fname_mask, dir_mask, &
+                   fname_coord, dir_coord, &
+                   ires, jres
+
+ namelist /output/  fname, dir, &
+                    gridtype, &
+                    fname_mask, dir_mask, &
+                    fname_coord, dir_coord,&
+                    ires, jres
+
+ ! set defaults 
+ fname = default_str
+ dir = default_str
+ fname_mask = default_str
+ dir_mask = default_str
+ fname_coord = default_str
+ dir_coord = default_str
+ ires = 0 
+ jres = 0
+
+ select case (namel)
+ case ("input") 
+     read(unt, nml=input, iostat=ierr)
+     if (ierr /= 0) call error_handler("READING input NAMELIST.", ierr)
+ case ("output")
+     read(unt, nml=output, iostat=ierr)
+     if (ierr /= 0) call error_handler("READING output NAMELIST.", ierr)
+ case default 
+     call error_handler("unknown namel in readin_setup", 1)
+ end select  
+
+ grid_setup%descriptor = gridtype
+
+ grid_setup%dir = dir
+ grid_setup%fname = fname 
+
+ ! to-do, add routine to check if present.
+ select case (namel)
+ case ("input") 
+     grid_setup%dir_mask = dir ! use input file for mask
+     grid_setup%fname_mask = fname 
+ case ("output")
+     grid_setup%dir_mask = dir_mask ! need a file on output grid for mask
+     grid_setup%fname_mask = fname_mask
+ end select  
+
+ ! set-up mask details, based on file type
+ select case (gridtype) 
+ case ("fv3_rst") ! for history file and restarts, use veg type 
+        !grid_setup%mask_variable(1) = "vtype          " ! if getting from a restart
+        grid_setup%mask_variable(1) =  "vegetation_type" ! if getting from fix file
+ case ("gau_inc") ! gsi-output incr files only, use calculated mask
+        grid_setup%mask_variable(1) =  "soilsnow_mask  "  
+ case default 
+     call error_handler("unknown gridtype in readin_setup", 1)
+ end select
+
+ grid_setup%dir_coord = dir_coord
+ grid_setup%fname_coord = fname_coord
+ grid_setup%ires = ires
+ grid_setup%jres = jres
+
+ end subroutine
+!-------------------------------------------------------------------------
