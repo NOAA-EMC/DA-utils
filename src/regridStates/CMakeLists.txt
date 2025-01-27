@@ -1,3 +1,4 @@
+find_package(ESMF 8.0.0 REQUIRED) 
 
 ecbuild_add_executable( TARGET regridStates.x
                         SOURCES regridStates.F90

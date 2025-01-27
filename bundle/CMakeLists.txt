@@ -41,6 +41,9 @@ if(APPLE)
 endif()
 list( APPEND CMAKE_INSTALL_RPATH ${CMAKE_CURRENT_BINARY_DIR}/fv3 )
 
+# Handle user options
+option(BUILD_REGRID_STATES "Build regrid states land DA utility" ON)
+
 # Initialize bundle
 # -----------------
 ecbuild_bundle_initialize()
