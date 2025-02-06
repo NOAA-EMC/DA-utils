@@ -1,6 +1,6 @@
  module grids_IO
  ! ESMF grid-specific routines for GFS regridding program, including IO.
- ! 
+ !
  ! Clara Draper, Aug 2024.
 
  use esmf
@@ -16,7 +16,7 @@
  integer, public, parameter  :: vtype_water=0, & ! TO DO - which veg classification is this?
                                 vtype_landice=15 ! used for soil mask
  ! mask values for soilsnow_mask calculated in the GSI EnKF
- integer, public, parameter  :: mtype_water=0, & 
+ integer, public, parameter  :: mtype_water=0, &
                                 mtype_snow=2
  type, public  :: grid_setup_type
         character(7)   :: descriptor
@@ -30,7 +30,7 @@
         integer        :: ires
         integer        :: jres
  end type
- 
+
  public :: setup_grid, &
            read_into_fields, &
            write_from_fields
@@ -48,11 +48,11 @@
  type(grid_setup_type), intent(in)    :: grid_setup
  integer, intent(in)            :: localpet, npets
 
- ! INTENT OUT 
+ ! INTENT OUT
  type(esmf_grid)                :: mod_grid
 
  ! LOCAL
- type(esmf_field)               :: mask_field(1)
+ type(esmf_field)               :: mask_field(1,1)
  real(esmf_kind_r8), pointer    :: ptr_maskvar(:,:)
  integer(esmf_kind_i4), pointer :: ptr_mask(:,:)
 
@@ -66,14 +66,14 @@
      call create_grid_fv3(grid_setup%ires, trim(grid_setup%dir_coord), npets, localpet ,mod_grid)
  case ('gau_inc')
      call create_grid_gauss(grid_setup, npets, localpet,  mod_grid)
- case default 
+ case default
      call error_handler("unknown grid_setup%descriptor in setup_grid", 1)
  end select
 
 !--------------------------
 ! Calculate and add the mask
 
- mask_field(1) = ESMF_FieldCreate(mod_grid, &
+ mask_field(1,1) = ESMF_FieldCreate(mod_grid, &
                                    typekind=ESMF_TYPEKIND_R8, &
                                    staggerloc=ESMF_STAGGERLOC_CENTER, &
                                    name="input variable for mask", &
@@ -83,10 +83,10 @@
 
  call read_into_fields(localpet, grid_setup%ires, grid_setup%jres, trim(grid_setup%fname_mask), &
                          trim(grid_setup%dir_mask), grid_setup, 1, &
-                         grid_setup%mask_variable(1), mask_field(1))
+                         grid_setup%mask_variable(1), mask_field(1,1))
 
 ! get pointer to mask
- call ESMF_FieldGet(mask_field(1), &
+ call ESMF_FieldGet(mask_field(1,1), &
                     farrayPtr=ptr_maskvar, &
                     rc=ierr)
  if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
@@ -100,7 +100,7 @@
  if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
     call error_handler("in GridAddItem mask", ierr)
 
- call ESMF_GridGetItem(mod_grid, & 
+ call ESMF_GridGetItem(mod_grid, &
                        itemflag=ESMF_GRIDITEM_MASK, &
                        farrayPtr=ptr_mask, &
                        rc=ierr)
@@ -121,7 +121,7 @@
  end select
 
 ! destroy mask field
- call ESMF_FieldDestroy(mask_field(1),rc=ierr)
+ call ESMF_FieldDestroy(mask_field(1,1),rc=ierr)
  if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
     call error_handler("DESTROYING FIELD", ierr)
 
@@ -129,9 +129,9 @@
 
  ! read variables from fv3 netcdf restart file into ESMF Fields
  subroutine read_into_fields(localpet, i_dim, j_dim , fname_read, dir_read, &
-                               grid_setup, n_vars, variable_list, fields) 
- 
- implicit none 
+                               grid_setup, n_vars, variable_list, fields)
+
+ implicit none
 
  ! INTENT IN
  integer, intent(in)             :: localpet, i_dim, j_dim, n_vars
@@ -140,9 +140,9 @@
  type(grid_setup_type), intent(in)        :: grid_setup
 
  character(len=15), dimension(n_vars), intent(in)   :: variable_list
- 
- ! INTENT OUT 
- type(esmf_field), dimension(n_vars), intent(inout) :: fields
+
+ ! INTENT OUT
+ type(esmf_field), dimension(1,n_vars), intent(inout) :: fields
 
  ! LOCAL
  integer                         :: tt, id_var, ncid, ierr, v
@@ -155,7 +155,7 @@
  if (localpet==0) then
      allocate(array_in(n_vars,i_dim, j_dim))
      allocate(array2D(i_dim, j_dim))
- else 
+ else
      allocate(array_in(0,0,0))
      allocate(array2D(0,0))
  end if
@@ -163,12 +163,12 @@
  select case (grid_setup%descriptor)
  case ('fv3_rst')
      n_files=n_tiles
- case ('gau_inc') 
+ case ('gau_inc')
      n_files=1
  case default
      call error_handler("unknown grid_setup%descriptor in read into fields", 1)
  end select
-     
+
  do tt = 1, n_files
 
       ! read from restart
@@ -201,14 +201,14 @@
       ! scatter
       do v =1, n_vars
           array2D=array_in(v,:,:) ! scatter misbehaves if given indexed 3D array.
-          call ESMF_FieldScatter(fields(v), array2D, rootpet=0, tile=tt, rc=ierr)
+          call ESMF_FieldScatter(fields(1,v), array2D, rootpet=0, tile=tt, rc=ierr)
           if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
              call error_handler("IN FieldScatter", ierr)
 
       enddo
 
  enddo
- 
+
  ! clean up
  deallocate(array_in)
 
@@ -218,8 +218,8 @@
 
  subroutine lonlat_read_into_fields(localpet, i_dim, j_dim, fname_read, dir_read, &
                                grid_setup, gauss_grid, lon_fields, lat_fields)
- 
- implicit none 
+
+ implicit none
 
  ! INTENT IN
  integer, intent(in)             :: localpet, i_dim, j_dim
@@ -228,8 +228,8 @@
  type(grid_setup_type), intent(in)        :: grid_setup
  type(esmf_grid), intent(in)     :: gauss_grid
 
- 
- ! INTENT OUT 
+
+ ! INTENT OUT
  type(esmf_field), dimension(2), intent(out) :: lon_fields
  type(esmf_field), dimension(2), intent(out) :: lat_fields
 
@@ -247,21 +247,21 @@
  ! center coord names
  lonvar_list(1) = 'grid_center_lon'
  latvar_list(1) = 'grid_center_lat'
- 
+
  ! corner coord names
  lonvar_list(2) = 'grid_corner_lon'
  latvar_list(2) = 'grid_corner_lat'
 
- ! Create the fields 
+ ! Create the fields
  do v=1,2
-        vname="gauss_grid_" // trim(lonvar_list(v)) 
+        vname="gauss_grid_" // trim(lonvar_list(v))
         lon_fields(v) = ESMF_FieldCreate(gauss_grid, &
                                    typekind=ESMF_TYPEKIND_R8, &
                                    staggerloc=ESMF_STAGGERLOC_CENTER, &
                                    name=vname, rc=ierr)
         if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
         call error_handler("IN FieldCreate", ierr)
- 
+
         vname="gauss_grid_" // trim(latvar_list(v))
         lat_fields(v) = ESMF_FieldCreate(gauss_grid, &
                                    typekind=ESMF_TYPEKIND_R8, &
@@ -270,12 +270,12 @@
         if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
         call error_handler("IN FieldCreate", ierr)
  enddo
- 
+
  if (localpet==0) then
      allocate(array_lat(2, i_dim, j_dim))
      allocate(array_lon(2, i_dim, j_dim))
      allocate(array2d( i_dim, j_dim))
- else 
+ else
      allocate(array_lat(2,0,0))
      allocate(array_lon(2,0,0))
      allocate(array2d(0,0))
@@ -316,7 +316,7 @@
                 array_tmp = reshape(vec1,(/i_dim,j_dim/))
                 array_lat(1,:,j) = array_tmp(:,j_dim+1-j)
         enddo
-     else 
+     else
         array_lat(1,:,:) = reshape(vec1,(/i_dim,j_dim/))
      endif
 
@@ -328,7 +328,7 @@
 
      ierr=nf90_get_var(ncid, id_var, vec4)
      call netcdf_err(ierr, 'reading variable' )
- 
+
      ! 2nd element of vec4 is the NW corner
      array_lon(2,:,:) = reshape(vec4(2,:),(/i_dim,j_dim/))
 
@@ -346,7 +346,7 @@
                 array_tmp = reshape(vec4(2,:),(/i_dim,j_dim/))
                 array_lat(2,:,j) = array_tmp(:,j_dim+1-j)
         enddo
-     else 
+     else
         ! 2nd element of vec4 is the NW corner
         array_lat(2,:,:) = reshape(vec4(2,:),(/i_dim,j_dim/))
      endif
@@ -354,7 +354,7 @@
      ierr = nf90_close(ncid)
   endif
 
-  ! scatter the arrays into the fields 
+  ! scatter the arrays into the fields
   do v =1,2
 
       ! scatter longitudes
@@ -363,7 +363,7 @@
       call ESMF_FieldScatter(lon_fields(v), array2d, rootpet=0,  rc=ierr)
       if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
          call error_handler("IN FieldScatter", ierr)
-     
+
       ! scatter latitude
       if (localpet==0) print *, 'scattering lat', latvar_list(v)
       array2d=array_lat(v,:,:)
@@ -378,51 +378,53 @@
  deallocate(array2d)
 
  end subroutine lonlat_read_into_fields
-! write variables from ESMF Fields into netcdf restart-like file 
+! write variables from ESMF Fields into netcdf restart-like file
 
  subroutine write_from_fields(localpet, i_dim, j_dim , fname_out, dir_out, &
-                                n_vars, variable_list, fields) 
+                                n_vars, n_tims, variable_list, fields)
 
- implicit none 
+ implicit none
 
  ! INTENT IN
- integer, intent(in)             :: localpet, i_dim, j_dim, n_vars
+ integer, intent(in)             :: localpet, i_dim, j_dim,  n_vars, n_tims
  character(*), intent(in)        :: fname_out
  character(*), intent(in)        :: dir_out
  character(15), dimension(n_vars), intent(in)     :: variable_list
- type(esmf_field), dimension(n_vars), intent(in)  :: fields
+ type(esmf_field), dimension(n_tims,n_vars), intent(in)  :: fields
 
  ! LOCAL
  integer                         :: tt, id_var, ncid, ierr, &
-                                   id_x, id_y, v
+                                    id_x, id_y, id_t, v, t
  character(len=1)                :: tchar
  character(len=500)              :: fname
  real(esmf_kind_r8), allocatable :: array2D(:,:)
- real(esmf_kind_r8), allocatable :: array_out(:,:,:)
+ real(esmf_kind_r8), allocatable :: array_out(:,:,:,:)
 
  do v = 1, n_vars
         if (localpet == 0)  print *, 'Writing ', trim(variable_list(v)), ' into field'
  enddo
 
  if (localpet==0) then
-     allocate(array_out(n_vars, i_dim, j_dim))
+     allocate(array_out(n_vars, i_dim, j_dim, n_tims))
      allocate(array2D(i_dim, j_dim))
- else 
-     allocate(array_out(0,0,0))
+ else
+     allocate(array_out(0,0,0,0))
      allocate(array2D(0,0))
  end if
 
  do tt = 1, n_tiles
 
       ! fetch data (all PETs)
-      do  v=1, n_vars
-          call ESMF_FieldGather(fields(v), array2D, rootPet=0, tile=tt, rc=ierr)
-          if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
-             call error_handler("IN FieldGather", ierr)
-          array_out(v,:,:) = array2D
+      do t =1 , n_tims
+          do v = 1, n_vars
+              call ESMF_FieldGather(fields(t,v), array2D, rootPet=0, tile=tt, rc=ierr)
+              if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
+                 call error_handler("IN FieldGather", ierr)
+              array_out(v,:,:,t) = array2D
+          enddo
       enddo
 
-      ! write to netcdf 
+      ! write to netcdf
       if (localpet == 0) then
 
          ! open file, set dimensions
@@ -432,19 +434,39 @@
          ierr = nf90_create(trim(fname), NF90_NETCDF4, ncid)
          call netcdf_err(ierr, 'creating file='//trim(fname) )
 
+         if (n_tims>1) then ! UFS_UTILS expects input with no time dim
+                           ! GFS (for IAU) expects a time dimension
+                           ! later: update GFS to not expect a time dimension
+             ierr = nf90_def_dim(ncid, 'Time', n_tims, id_t)
+             call netcdf_err(ierr, 'defining taxis dimension' )
+         endif
+
          ierr = nf90_def_dim(ncid, 'xaxis_1', i_dim, id_x)
          call netcdf_err(ierr, 'defining xaxis dimension' )
 
          ierr = nf90_def_dim(ncid, 'yaxis_1', j_dim, id_y)
          call netcdf_err(ierr, 'defining yaxis dimension' )
 
+
          do v=1, n_vars
 
-             ierr = nf90_def_var(ncid, trim(variable_list(v)), NF90_DOUBLE, (/id_x, id_y/), id_var)
+             if (n_tims>1) then
+                 ! UFS model code to read in the increments is expecting
+                 ! dimensions: time, y, x (in the ncdump read out - which reverses fortran indexes)
+                 ! need dimensions to be x,y,t below.
+                 ierr = nf90_def_var(ncid, trim(variable_list(v)), NF90_DOUBLE, &
+                                     (/id_x, id_y, id_t/) , id_var)
+
+                 call netcdf_err(ierr, 'defining '//variable_list(v) )
+             else
+                 ierr = nf90_def_var(ncid, trim(variable_list(v)), NF90_DOUBLE, &
+                                     (/id_x, id_y/) , id_var)
+             endif
+
              call netcdf_err(ierr, 'defining '//variable_list(v) )
-              
-             ierr = nf90_put_var( ncid, id_var, array_out(v,:,:) ) 
-             call netcdf_err(ierr, 'writing '//variable_list(v) ) 
+
+             ierr = nf90_put_var( ncid, id_var, array_out(v,:,:,:) )
+             call netcdf_err(ierr, 'writing '//variable_list(v) )
 
          enddo
 
@@ -453,14 +475,14 @@
       endif
 
  enddo
- 
+
  ! clean up
  deallocate(array_out)
 
  end subroutine write_from_fields
 
  ! subroutine to create grid object for fv3 grid
- ! also sets distribution across procs 
+ ! also sets distribution across procs
 
  subroutine create_grid_fv3(res_atm, dir_fix, npets, localpet, fv3_grid)
 
@@ -469,16 +491,16 @@
  integer, intent(in)    :: res_atm
  character(*), intent(in)       :: dir_fix
 
- ! INTENT OUT 
+ ! INTENT OUT
  type(esmf_grid)                :: fv3_grid
 
- integer                :: ierr, extra, tile 
+ integer                :: ierr, extra, tile
  integer                :: decomptile(2,n_tiles)
- 
+
  character(len=5)       :: rchar
  character(len=200)     :: fname, dir_fix_res
 
- if (localpet == 0) print*," creating fv3 grid for ", res_atm 
+ if (localpet == 0) print*," creating fv3 grid for ", res_atm
 
 ! pet distribution
  extra = npets / n_tiles
@@ -486,11 +508,11 @@
    decomptile(:,tile)=(/1,extra/)
  enddo
 
- ! mosaic file 
+ ! mosaic file
  write(rchar,'(i3)') res_atm
  dir_fix_res = dir_fix//"/C"//trim(adjustl(rchar))//"/"
  fname = trim(dir_fix_res)//"/C"//trim(adjustl(rchar))// "_mosaic.nc"
- 
+
 ! create the grid
  fv3_grid = ESMF_GridCreateMosaic(filename=trim(fname), &
                                   regDecompPTile=decomptile, &
@@ -509,8 +531,8 @@
  ! INTENT IN
  type(grid_setup_type), intent(in) :: grid_setup
  integer, intent(in)   :: npets, localpet
- 
- ! INTENT OUT 
+
+ ! INTENT OUT
  type(esmf_grid)                   :: gauss_grid
 
  type(esmf_polekind_flag)          :: polekindflag(2)
@@ -545,7 +567,7 @@
  call lonlat_read_into_fields(localpet, i_dim, j_dim,  &
                          trim(grid_setup%fname_coord), trim(grid_setup%dir_coord), &
                          grid_setup, gauss_grid, lon_fields, lat_fields)
- 
+
  staggerloc = (/ ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER /)
  do v = 1,2
      ! add coordinates to the grid
@@ -572,13 +594,13 @@
                         rc=ierr)
      if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
             call error_handler("IN FieldGet longitude", ierr)
-     
-     ! set coord pointe to field pointer 
+
+     ! set coord pointe to field pointer
      lon_ptr_coord = lon_ptr_field
 
      nullify(lat_ptr_coord)
      nullify(lat_ptr_field)
-     
+
      ! get pointer to lat coord. Need bounds?
      call ESMF_GridGetCoord(gauss_grid, &
                             staggerLoc=staggerloc(v), &
@@ -587,14 +609,14 @@
      if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
         call error_handler("IN GridGetCoord latitude", ierr)
 
-     ! fetch lat from field into pointer 
+     ! fetch lat from field into pointer
      call ESMF_FieldGet(lat_fields(v), &
                         farrayPtr=lat_ptr_field, &
                         rc=ierr)
      if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
             call error_handler("IN FieldGet latitude", ierr)
 
-     ! set lat coord to field values 
+     ! set lat coord to field values
      lat_ptr_coord =  lat_ptr_field
  enddo
 
@@ -607,7 +629,7 @@
      if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
         call error_handler("DESTROYING FIELD", ierr)
  enddo
-  
+
  end subroutine create_grid_gauss
 
 end  module grids_IO

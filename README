@@ -4,5 +4,6 @@ To compile regridding tool in stand-alone mode:
  load GDASApp modules
 > cd DA-utils
 > mkdir build
+> cd build
 > ecbuild ../bundle
 > make
