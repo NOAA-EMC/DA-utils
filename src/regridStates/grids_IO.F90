@@ -509,7 +509,7 @@
  enddo
 
  ! mosaic file
- write(rchar,'(i3)') res_atm
+ write(rchar,'(i5)') res_atm
  dir_fix_res = dir_fix//"/C"//trim(adjustl(rchar))//"/"
  fname = trim(dir_fix_res)//"/C"//trim(adjustl(rchar))// "_mosaic.nc"
 
