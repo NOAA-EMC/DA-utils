@@ -55,8 +55,9 @@ namespace dautils {
         std::vector<eckit::LocalConfiguration> obsSpaces;
         fullConfig.get("obs spaces", obsSpaces);
 
-        // for now, just do this serially, eventually, make it parallelized
-        for (int i = 0; i < obsSpaces.size(); i++) {
+        // get MPI comm size
+        int nprocs = getComm().size();
+        for (int i = getComm().rank(); i < obsSpaces.size(); i+= nprocs) {
           // get the configuration for this obs space
           auto obsSpace = obsSpaces[i];
           eckit::LocalConfiguration obsConfig(obsSpace, "obs space");
