@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "eckit/config/LocalConfiguration.h"
+#include "eckit/mpi/Comm.h"
 
 #include "ioda/Engines/EngineUtils.h"
 #include "ioda/Group.h"
@@ -55,8 +56,12 @@ namespace dautils {
         std::vector<eckit::LocalConfiguration> obsSpaces;
         fullConfig.get("obs spaces", obsSpaces);
 
-        // for now, just do this serially, eventually, make it parallelized
-        for (int i = 0; i < obsSpaces.size(); i++) {
+        // get the communicator for just me
+        const eckit::mpi::Comm & mycomm = oops::mpi::myself();
+
+        // get MPI comm size
+        int nprocs = getComm().size();
+        for (int i = getComm().rank(); i < obsSpaces.size(); i+= nprocs) {
           // get the configuration for this obs space
           auto obsSpace = obsSpaces[i];
           eckit::LocalConfiguration obsConfig(obsSpace, "obs space");
@@ -65,7 +70,7 @@ namespace dautils {
           std::string obsFile;
           obsConfig.get("obsdatain.engine.obsfile", obsFile);
           oops::Log::info() << "IODA-Stats: Processing " << obsFile << std::endl;
-          ioda::ObsSpace ospace(obsConfig, getComm(), timeWindow, getComm());
+          ioda::ObsSpace ospace(obsConfig, mycomm, timeWindow, mycomm);
           const size_t nlocs = ospace.nlocs();
           oops::Log::info() << obsFile << ": nlocs =" << nlocs << std::endl;
 
