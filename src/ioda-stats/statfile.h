@@ -49,9 +49,10 @@ namespace dautils {
       }
 
       // loop over group, then variables, then stats to create /group/var/stat in file
+      netCDF::NcGroup domaingroup = ncFile.addGroup("byDomains");
       for (int g = 0; g < groups.size(); g++) {
         // create group group
-        netCDF::NcGroup group = ncFile.addGroup(groups[g]);
+        netCDF::NcGroup group = domaingroup.addGroup(groups[g]);
         // loop over variables
         for (int var = 0; var < variables.size(); var++) {
           // create variable group
@@ -75,7 +76,8 @@ namespace dautils {
     int write(const std::string filename, const std::string group, const std::string variable,
               const std::string stat, const int idom, const std::vector<int> intvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
-      netCDF::NcGroup outgroup1 = ncFile.getGroup(group);
+      netCDF::NcGroup domaingroup = ncFile.getGroup("byDomains");
+      netCDF::NcGroup outgroup1 = domaingroup.getGroup(group);
       netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
       netCDF::NcVar outvar = outgroup2.getVar(stat);
       std::vector<size_t> idxout;
@@ -88,7 +90,8 @@ namespace dautils {
     int write(const std::string filename, const std::string group, const std::string variable,
               const std::string stat, const int idom, const std::vector<float> floatvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
-      netCDF::NcGroup outgroup1 = ncFile.getGroup(group);
+      netCDF::NcGroup domaingroup = ncFile.getGroup("byDomains");
+      netCDF::NcGroup outgroup1 = domaingroup.getGroup(group);
       netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
       netCDF::NcVar outvar = outgroup2.getVar(stat);
       std::vector<size_t> idxout;
