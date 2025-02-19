@@ -498,7 +498,7 @@
  integer                :: decomptile(2,n_tiles)
 
  character(len=5)       :: rchar
- character(len=200)     :: fname, dir_fix_res
+ character(len=200)     :: fname
 
  if (localpet == 0) print*," creating fv3 grid for ", res_atm
 
@@ -510,8 +510,7 @@
 
  ! mosaic file
  write(rchar,'(i5)') res_atm
- dir_fix_res = dir_fix//"/C"//trim(adjustl(rchar))//"/"
- fname = trim(dir_fix_res)//"/C"//trim(adjustl(rchar))// "_mosaic.nc"
+ fname = trim(dir_fix)//"/C"//trim(adjustl(rchar))// "_mosaic.nc"
 
 ! create the grid
  fv3_grid = ESMF_GridCreateMosaic(filename=trim(fname), &
@@ -519,7 +518,7 @@
                                   staggerLocList=(/ESMF_STAGGERLOC_CENTER, ESMF_STAGGERLOC_CORNER, &
                                                    ESMF_STAGGERLOC_EDGE1, ESMF_STAGGERLOC_EDGE2/), &
                                   indexflag=ESMF_INDEX_GLOBAL, &
-                                  tileFilePath=trim(dir_fix_res), &
+                                  tileFilePath=trim(dir_fix), &
                                   rc=ierr)
  if(ESMF_logFoundError(rcToCheck=ierr,msg=ESMF_LOGERR_PASSTHRU,line=__LINE__,file=__FILE__)) &
     call error_handler("IN GridCreateMosaic", ierr)
