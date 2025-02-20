@@ -134,6 +134,18 @@ namespace dautils {
             domainMaskVals3.push_back(maskvals3);
           }
 
+          // determine if we are doing regular binning for this obs space
+          int nbins_x = 0;
+          int nbins_y = 0;
+          if (obsSpace.has("regular grid binning")) {
+            eckit::LocalConfiguration binConfig;
+            obsSpace.get("regular grid binning", binConfig);
+            float binsize;
+            binConfig.get("bin size in degrees", binsize);
+            nbins_x = int(360.0 / binsize);
+            nbins_y = int(180.0 / binsize);
+          }
+
           // assert that the QC groups list is the same size as groups
           assert(groups.size() == qcgroups.size());
 
@@ -141,7 +153,8 @@ namespace dautils {
           std::string outfile;
           obsSpace.get("output file", outfile);
           StatFile statfile;
-          statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups, stats, domainNames);
+          statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups,
+                                    stats, domainNames, nbins_x, nbins_y);
 
           // loop over domains, compute the masks for each
           std::vector<std::vector<int>> mask(domains.size()+1, std::vector<int>(nlocs, 0));
@@ -213,11 +226,11 @@ namespace dautils {
                     oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
                   }
                   if (stats[s] == "count") {
-                    statfile.write(outfile, groups[g], variables[var],
-                                   stats[s], idom, intstat);
+                    statfile.writeByDomains(outfile, groups[g], variables[var],
+                                            stats[s], idom, intstat);
                   } else {
-                    statfile.write(outfile, groups[g], variables[var],
-                                   stats[s], idom, floatstat);
+                    statfile.writeByDomains(outfile, groups[g], variables[var],
+                                            stats[s], idom, floatstat);
                   }
                 }
               }

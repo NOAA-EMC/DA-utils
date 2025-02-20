@@ -13,9 +13,11 @@ namespace dautils {
     int initializeNcfile(const std::string filename, const util::TimeWindow timeWindow,
                       std::vector<std::string> variables, std::vector<int> channels,
                       std::vector<std::string> groups, std::vector<std::string> stats,
-                      std::vector<std::string> domainNames) {
+                      std::vector<std::string> domainNames,
+                      int nbins_x, int nbins_y) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::replace);
       oops::Log::info() << "Opening " << filename << " for writing..." << std::endl;
+      oops::Log::info() << "nbins_x:" << nbins_x << " nbins_y:" << nbins_y << std::endl;
       // create an unlimited time dimension
       netCDF::NcDim tDim = ncFile.addDim("analysisCycle");
       // create domain dimension
@@ -73,7 +75,7 @@ namespace dautils {
     };
 
     // Overloaded write methods
-    int write(const std::string filename, const std::string group, const std::string variable,
+    int writeByDomains(const std::string filename, const std::string group, const std::string variable,
               const std::string stat, const int idom, const std::vector<int> intvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
       netCDF::NcGroup domaingroup = ncFile.getGroup("byDomains");
@@ -87,7 +89,7 @@ namespace dautils {
       return 0;
     };
 
-    int write(const std::string filename, const std::string group, const std::string variable,
+    int writeByDomains(const std::string filename, const std::string group, const std::string variable,
               const std::string stat, const int idom, const std::vector<float> floatvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
       netCDF::NcGroup domaingroup = ncFile.getGroup("byDomains");
