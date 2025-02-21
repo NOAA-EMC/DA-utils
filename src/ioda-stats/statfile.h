@@ -14,25 +14,46 @@ namespace dautils {
                       std::vector<std::string> variables, std::vector<int> channels,
                       std::vector<std::string> groups, std::vector<std::string> stats,
                       std::vector<std::string> domainNames,
-                      int nbins_x, int nbins_y) {
+                      int nbins_x, int nbins_y,
+                      std::vector<std::string> bins_z) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::replace);
       oops::Log::info() << "Opening " << filename << " for writing..." << std::endl;
-      oops::Log::info() << "nbins_x:" << nbins_x << " nbins_y:" << nbins_y << std::endl;
       // create an unlimited time dimension
       netCDF::NcDim tDim = ncFile.addDim("analysisCycle");
       // create domain dimension
       int ndomains = domainNames.size() + 1;
       netCDF::NcDim dDim = ncFile.addDim("Domain", ndomains);
       // vector of dimensions
-      std::vector<netCDF::NcDim> dimVector;
-      dimVector.push_back(tDim);
-      dimVector.push_back(dDim);
+      std::vector<netCDF::NcDim> domainDimVector, binningDimVector;
+      domainDimVector.push_back(tDim);
+      domainDimVector.push_back(dDim);
       // if channel is not empty, create a channel dimension
       netCDF::NcDim cDim;
       if (!channels.empty()) {
         cDim = ncFile.addDim("Channel", channels.size());
-        dimVector.push_back(cDim);
+        domainDimVector.push_back(cDim);
       }
+      // if nbins_x or nbins_y are nonzero, make them dimensions too
+      netCDF::NcDim xDim, yDim, zDim;
+      if (nbins_x > 0 || nbins_y > 0) {
+        binningDimVector.push_back(tDim);
+        if (!channels.empty()) {
+          cDim = ncFile.addDim("Channel", channels.size());
+          binningDimVector.push_back(cDim);
+        } else {
+          zDim = ncFile.addDim("binsZDim", bins_z.size());
+          binningDimVector.push_back(zDim);
+        }
+      }
+      if (nbins_x > 0) {
+        xDim = ncFile.addDim("binsXDim", nbins_x);
+        binningDimVector.push_back(xDim);
+      }
+      if (nbins_y > 0) {
+        yDim = ncFile.addDim("binsYDim", nbins_y);
+        binningDimVector.push_back(yDim);
+      }
+
       // create validTime variable
       netCDF::NcVar time = ncFile.addVar("validTime", netCDF::ncString, tDim);
       // put the analysis time in the file
@@ -50,6 +71,14 @@ namespace dautils {
         domain.putVar(idxdom, domainNames[idom]);
       }
 
+      // create vertical bin variable
+      netCDF::NcVar zbins = ncFile.addVar("verticalBin", netCDF::ncString, zDim);
+      for (int ibin = 0; ibin < bins_z.size(); ibin++) {
+        std::vector<size_t> idxbin;
+        idxbin.push_back(ibin);
+        zbins.putVar(idxbin, bins_z[ibin]);
+      }
+
       // loop over group, then variables, then stats to create /group/var/stat in file
       netCDF::NcGroup domaingroup = ncFile.addGroup("byDomains");
       for (int g = 0; g < groups.size(); g++) {
@@ -63,9 +92,9 @@ namespace dautils {
           for (int s = 0; s < stats.size(); s++) {
             netCDF::NcVar varout;
             if (stats[s] == "count") {
-              varout = group2.addVar(stats[s], netCDF::ncInt, dimVector);
+              varout = group2.addVar(stats[s], netCDF::ncInt, domainDimVector);
             } else {
-              varout = group2.addVar(stats[s], netCDF::ncFloat, dimVector);
+              varout = group2.addVar(stats[s], netCDF::ncFloat, domainDimVector);
             }
           }
         }

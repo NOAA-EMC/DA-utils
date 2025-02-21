@@ -137,6 +137,9 @@ namespace dautils {
           // determine if we are doing regular binning for this obs space
           int nbins_x = 0;
           int nbins_y = 0;
+          std::vector<std::string> zBinNames;
+          std::vector<std::string> zBinMaskVar;
+          std::vector<std::vector<float>> zBinMaskVals;          
           if (obsSpace.has("regular grid binning")) {
             eckit::LocalConfiguration binConfig;
             obsSpace.get("regular grid binning", binConfig);
@@ -144,6 +147,22 @@ namespace dautils {
             binConfig.get("bin size in degrees", binsize);
             nbins_x = int(360.0 / binsize);
             nbins_y = int(180.0 / binsize);
+            std::vector<eckit::LocalConfiguration> zBins;
+            if (binConfig.has("vertical bins")) {
+              binConfig.get("vertical bins", zBins);
+              for (int idom = 0; idom < zBins.size(); idom++ ) {
+                auto zBin = zBins[idom];
+                eckit::LocalConfiguration binConf(zBin, "vertical bin");
+                std::string binname, maskvar;
+                std::vector<float> maskvals;
+                binConf.get("name", binname);
+                binConf.get("mask variable", maskvar);
+                binConf.get("mask range", maskvals);
+                zBinNames.push_back(binname);
+                zBinMaskVar.push_back(maskvar);
+                zBinMaskVals.push_back(maskvals);
+              }
+            }
           }
 
           // assert that the QC groups list is the same size as groups
@@ -154,7 +173,7 @@ namespace dautils {
           obsSpace.get("output file", outfile);
           StatFile statfile;
           statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups,
-                                    stats, domainNames, nbins_x, nbins_y);
+                                    stats, domainNames, nbins_x, nbins_y, zBinNames);
 
           // loop over domains, compute the masks for each
           std::vector<std::vector<int>> mask(domains.size()+1, std::vector<int>(nlocs, 0));
