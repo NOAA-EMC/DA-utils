@@ -45,13 +45,14 @@ namespace dautils {
           binningDimVector.push_back(zDim);
         }
       }
-      if (nbins_x > 0) {
-        xDim = ncFile.addDim("binsXDim", nbins_x);
-        binningDimVector.push_back(xDim);
-      }
+
       if (nbins_y > 0) {
         yDim = ncFile.addDim("binsYDim", nbins_y);
         binningDimVector.push_back(yDim);
+      }
+      if (nbins_x > 0) {
+        xDim = ncFile.addDim("binsXDim", nbins_x);
+        binningDimVector.push_back(xDim);
       }
 
       // create validTime variable
