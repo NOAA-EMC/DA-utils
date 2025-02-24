@@ -79,7 +79,7 @@ namespace dautils {
         zbins.putVar(idxbin, bins_z[ibin]);
       }
 
-      // loop over group, then variables, then stats to create /group/var/stat in file
+      // loop over group, then variables, then stats to create byDomains/group/var/stat in file
       netCDF::NcGroup domaingroup = ncFile.addGroup("byDomains");
       for (int g = 0; g < groups.size(); g++) {
         // create group group
@@ -99,6 +99,30 @@ namespace dautils {
           }
         }
       }
+
+      // loop over group, then variables, then stats to create griddedBins/group/var/stat in file
+      if (nbins_x > 0 || nbins_y > 0) {
+        netCDF::NcGroup bingroup = ncFile.addGroup("griddedBins");
+        for (int g = 0; g < groups.size(); g++) {
+          // create group group
+          netCDF::NcGroup group = bingroup.addGroup(groups[g]);
+          // loop over variables
+          for (int var = 0; var < variables.size(); var++) {
+            // create variable group
+            netCDF::NcGroup group2 = group.addGroup(variables[var]);
+            // loop over statistics to write out
+            for (int s = 0; s < stats.size(); s++) {
+              netCDF::NcVar varout;
+              if (stats[s] == "count") {
+                varout = group2.addVar(stats[s], netCDF::ncInt, binningDimVector);
+              } else {
+                varout = group2.addVar(stats[s], netCDF::ncFloat, binningDimVector);
+              }
+            }
+          }
+        }        
+      }
+
       oops::Log::info() << "Output file " << filename << " has been created." << std::endl;
       return 0;
     };
@@ -131,5 +155,34 @@ namespace dautils {
       outvar.putVar(idxout, floatvals[0]);
       return 0;
     };
+
+    int writeByBins(const std::string filename, const std::string group, const std::string variable,
+              const std::string stat, const int ibin, const std::vector<int> intvals) {
+      netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
+      netCDF::NcGroup bingroup = ncFile.getGroup("griddedBins");
+      netCDF::NcGroup outgroup1 = bingroup.getGroup(group);
+      netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
+      netCDF::NcVar outvar = outgroup2.getVar(stat);
+      std::vector<size_t> idxout;
+      idxout.push_back(0);
+      idxout.push_back(ibin);
+      outvar.putVar(idxout, intvals[0]);
+      return 0;
+    };
+
+    int writeByBins(const std::string filename, const std::string group, const std::string variable,
+              const std::string stat, const int ibin, const std::vector<float> floatvals) {
+      netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
+      netCDF::NcGroup bingroup = ncFile.getGroup("griddedBins");
+      netCDF::NcGroup outgroup1 = bingroup.getGroup(group);
+      netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
+      netCDF::NcVar outvar = outgroup2.getVar(stat);
+      std::vector<size_t> idxout;
+      idxout.push_back(0);
+      idxout.push_back(ibin);
+      outvar.putVar(idxout, floatvals[0]);
+      return 0;
+    };
+
   };
 }  // namespace dautils
