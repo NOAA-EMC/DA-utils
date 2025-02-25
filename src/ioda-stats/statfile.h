@@ -5,11 +5,12 @@
 #include "oops/util/DateTime.h"
 #include "oops/util/Logger.h"
 #include "oops/util/TimeWindow.h"
+#include "oops/util/missingValues.h"
 
 namespace dautils {
   class StatFile {
     public:
-
+    float fillVal_ = util::missingValue<float>();
     int initializeNcfile(const std::string filename, const util::TimeWindow timeWindow,
                       std::vector<std::string> variables, std::vector<int> channels,
                       std::vector<std::string> groups, std::vector<std::string> stats,
@@ -96,6 +97,7 @@ namespace dautils {
               varout = group2.addVar(stats[s], netCDF::ncInt, domainDimVector);
             } else {
               varout = group2.addVar(stats[s], netCDF::ncFloat, domainDimVector);
+              varout.putAtt("_FillValue", netCDF::ncFloat, fillVal_);
             }
           }
         }
@@ -118,6 +120,7 @@ namespace dautils {
                 varout = group2.addVar(stats[s], netCDF::ncInt, binningDimVector);
               } else {
                 varout = group2.addVar(stats[s], netCDF::ncFloat, binningDimVector);
+                varout.putAtt("_FillValue", netCDF::ncFloat, fillVal_);
               }
             }
           }
