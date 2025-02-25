@@ -134,6 +134,37 @@ namespace dautils {
             domainMaskVals3.push_back(maskvals3);
           }
 
+          // determine if we are doing regular binning for this obs space
+          int nbins_x = 0;
+          int nbins_y = 0;
+          std::vector<std::string> zBinNames;
+          std::vector<std::string> zBinMaskVar;
+          std::vector<std::vector<float>> zBinMaskVals;          
+          if (obsSpace.has("regular grid binning")) {
+            eckit::LocalConfiguration binConfig;
+            obsSpace.get("regular grid binning", binConfig);
+            float binsize;
+            binConfig.get("bin size in degrees", binsize);
+            nbins_x = int(360.0 / binsize);
+            nbins_y = int(180.0 / binsize);
+            std::vector<eckit::LocalConfiguration> zBins;
+            if (binConfig.has("vertical bins")) {
+              binConfig.get("vertical bins", zBins);
+              for (int idom = 0; idom < zBins.size(); idom++ ) {
+                auto zBin = zBins[idom];
+                eckit::LocalConfiguration binConf(zBin, "vertical bin");
+                std::string binname, maskvar;
+                std::vector<float> maskvals;
+                binConf.get("name", binname);
+                binConf.get("mask variable", maskvar);
+                binConf.get("mask range", maskvals);
+                zBinNames.push_back(binname);
+                zBinMaskVar.push_back(maskvar);
+                zBinMaskVals.push_back(maskvals);
+              }
+            }
+          }
+
           // assert that the QC groups list is the same size as groups
           assert(groups.size() == qcgroups.size());
 
@@ -141,8 +172,12 @@ namespace dautils {
           std::string outfile;
           obsSpace.get("output file", outfile);
           StatFile statfile;
-          statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups, stats, domainNames);
+          statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups,
+                                    stats, domainNames, nbins_x, nbins_y, zBinNames);
 
+          // --------------------------------------------------------------------------
+          // first, compute stats over specified domains (or global only)
+          // --------------------------------------------------------------------------
           // loop over domains, compute the masks for each
           std::vector<std::vector<int>> mask(domains.size()+1, std::vector<int>(nlocs, 0));
           for (int idom = 0; idom < domains.size(); idom++ ) {
@@ -213,11 +248,111 @@ namespace dautils {
                     oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
                   }
                   if (stats[s] == "count") {
-                    statfile.write(outfile, groups[g], variables[var],
-                                   stats[s], idom, intstat);
+                    statfile.writeByDomains(outfile, groups[g], variables[var],
+                                            stats[s], idom, intstat);
                   } else {
-                    statfile.write(outfile, groups[g], variables[var],
-                                   stats[s], idom, floatstat);
+                    statfile.writeByDomains(outfile, groups[g], variables[var],
+                                            stats[s], idom, floatstat);
+                  }
+                }
+              }
+            }
+          }
+          // --------------------------------------------------------------------------
+          // now, compute stats over binned regions, if applicable
+          // --------------------------------------------------------------------------
+          if (obsSpace.has("regular grid binning")) {
+            // get lat/lon ranges based on bin sizes
+            std::vector<float> longitudes(nbins_x+1);
+            std::vector<float> latitudes(nbins_y+1);
+            float dx = 360.0 / float(nbins_x);
+            longitudes[0] = 0.0;
+            latitudes[0] = -90.0;
+            for (int ibin = 1; ibin < nbins_x+1; ibin++ ) {
+              longitudes[ibin] = longitudes[ibin-1] + dx;
+            }
+            for (int ibin = 1; ibin < nbins_y+1; ibin++ ) {
+              latitudes[ibin] = latitudes[ibin-1] + dx;
+            }
+            // loop over domains, compute the masks for each
+            oops::Log::info() << "--------------------------------------------" << std::endl;
+            std::vector<std::vector<int>> binmask(zBinNames.size() * nbins_x * nbins_y, std::vector<int>(nlocs, 0));
+            int ibin = 0;
+            for (int idom = 0; idom < zBinNames.size(); idom++ ) {
+              oops::Log::info() << "Now processing binned data for vertical bin: " << zBinNames[idom] << std::endl;
+              oops::Log::info() << "nbins_x: " << nbins_x << " nbins_y: " << nbins_y << std::endl;
+              // compute masks for the bins
+              ObsStats obstatbinmask;
+              std::vector<float> xmaskvalues(nlocs), ymaskvalues(nlocs), zmaskvalues(nlocs);
+              if (!zBinMaskVar[idom].empty()) {
+                ospace.get_db("MetaData", zBinMaskVar[idom], zmaskvalues);
+              }
+              ospace.get_db("MetaData", "latitude", ymaskvalues);
+              ospace.get_db("MetaData", "longitude", xmaskvalues);
+              for (int iy=0; iy < nbins_y; iy++) {
+                for (int ix=0; ix < nbins_x; ix++) {
+                  ibin = ix + (iy * nbins_x) + (idom * nbins_x * nbins_y);
+                  binmask[ibin] = obstatbinmask.update_mask(zmaskvalues, zBinMaskVals[idom][0], zBinMaskVals[idom][1], binmask[ibin]);
+                  binmask[ibin] = obstatbinmask.update_mask(ymaskvalues, latitudes[iy], latitudes[iy+1], binmask[ibin]);
+                  binmask[ibin] = obstatbinmask.update_mask(xmaskvalues, longitudes[ix], longitudes[ix+1], binmask[ibin]);
+                }
+              }
+            }
+            // loop over variables
+            for (int var = 0; var < variables.size(); var++) {
+              // loop over groups
+              for (int g = 0; g < groups.size(); g++) {
+                oops::Log::info() << obsFile << ": Now processing "
+                                  << groups[g] << "/" << variables[var] << std::endl;
+                std::vector<float> buffer(nlocs);
+                std::vector<int> qcflag(nlocs);
+                // we have to process differently if there are channels
+                if (channels.empty()) {
+                  // read the full variable
+                  ospace.get_db(groups[g], variables[var], buffer);
+                  // get the QC group
+                  ospace.get_db(qcgroups[g], variables[var], qcflag);
+                } else {
+                  // give the list of channels to read
+                  ospace.get_db(groups[g], variables[var], buffer, channels);
+                  // get the QC group
+                  ospace.get_db(qcgroups[g], variables[var], qcflag, channels);
+                }
+                // loop over stats
+                ObsStats obstat;
+                for (int s = 0; s < stats.size(); s++) {
+                  // loop over bins
+                  for (int idom = 0; idom < zBinNames.size(); idom++ ) {
+                    std::vector<std::vector<float>> fullfloatstat(nbins_y, std::vector<float>(nbins_x,0.0));
+                    std::vector<std::vector<int>> fullintstat(nbins_y, std::vector<int>(nbins_x,0.0));
+                    for (int iy=0; iy < nbins_y; iy++) {
+                      for (int ix=0; ix < nbins_x; ix++) {
+                        ibin = ix + (iy * nbins_x) + (idom * nbins_x * nbins_y);
+                        // Maybe eventually set this up as a factory but for now just do it
+                        // with this old school if/else if way
+                        std::vector<int> intstat;
+                        std::vector<float> floatstat;
+                        if (stats[s] == "count") {
+                          intstat = obstat.getObsCount(buffer, qcflag, channels, binmask[ibin]);
+                        } else if (stats[s] == "mean") {
+                          floatstat = obstat.getMean(buffer, qcflag, channels, binmask[ibin]);
+                        } else if (stats[s] == "RMS") {
+                          floatstat = obstat.getRMS(buffer, qcflag, channels, binmask[ibin]);
+                        }
+                        if (stats[s] == "count") {
+                          fullintstat[iy][ix] = intstat[0];
+                        } else {
+                          fullfloatstat[iy][ix] = floatstat[0];  
+                        }
+                      }
+                    }
+                    if (stats[s] == "count") {
+                      statfile.writeByBins(outfile, groups[g], variables[var],
+                                           stats[s], idom, nbins_y, nbins_x, fullintstat);                  
+                    } else {
+                      statfile.writeByBins(outfile, groups[g], variables[var],
+                                           stats[s], idom, nbins_y, nbins_x, fullfloatstat);
+                    }
                   }
                 }
               }

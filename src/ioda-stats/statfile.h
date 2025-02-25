@@ -5,15 +5,18 @@
 #include "oops/util/DateTime.h"
 #include "oops/util/Logger.h"
 #include "oops/util/TimeWindow.h"
+#include "oops/util/missingValues.h"
 
 namespace dautils {
   class StatFile {
     public:
-
+    float fillVal_ = util::missingValue<float>();
     int initializeNcfile(const std::string filename, const util::TimeWindow timeWindow,
                       std::vector<std::string> variables, std::vector<int> channels,
                       std::vector<std::string> groups, std::vector<std::string> stats,
-                      std::vector<std::string> domainNames) {
+                      std::vector<std::string> domainNames,
+                      int nbins_x, int nbins_y,
+                      std::vector<std::string> bins_z) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::replace);
       oops::Log::info() << "Opening " << filename << " for writing..." << std::endl;
       // create an unlimited time dimension
@@ -22,15 +25,37 @@ namespace dautils {
       int ndomains = domainNames.size() + 1;
       netCDF::NcDim dDim = ncFile.addDim("Domain", ndomains);
       // vector of dimensions
-      std::vector<netCDF::NcDim> dimVector;
-      dimVector.push_back(tDim);
-      dimVector.push_back(dDim);
+      std::vector<netCDF::NcDim> domainDimVector, binningDimVector;
+      domainDimVector.push_back(tDim);
+      domainDimVector.push_back(dDim);
       // if channel is not empty, create a channel dimension
       netCDF::NcDim cDim;
       if (!channels.empty()) {
         cDim = ncFile.addDim("Channel", channels.size());
-        dimVector.push_back(cDim);
+        domainDimVector.push_back(cDim);
       }
+      // if nbins_x or nbins_y are nonzero, make them dimensions too
+      netCDF::NcDim xDim, yDim, zDim;
+      if (nbins_x > 0 || nbins_y > 0) {
+        binningDimVector.push_back(tDim);
+        if (!channels.empty()) {
+          cDim = ncFile.addDim("Channel", channels.size());
+          binningDimVector.push_back(cDim);
+        } else {
+          zDim = ncFile.addDim("binsZDim", bins_z.size());
+          binningDimVector.push_back(zDim);
+        }
+      }
+
+      if (nbins_y > 0) {
+        yDim = ncFile.addDim("binsYDim", nbins_y);
+        binningDimVector.push_back(yDim);
+      }
+      if (nbins_x > 0) {
+        xDim = ncFile.addDim("binsXDim", nbins_x);
+        binningDimVector.push_back(xDim);
+      }
+
       // create validTime variable
       netCDF::NcVar time = ncFile.addVar("validTime", netCDF::ncString, tDim);
       // put the analysis time in the file
@@ -48,10 +73,19 @@ namespace dautils {
         domain.putVar(idxdom, domainNames[idom]);
       }
 
-      // loop over group, then variables, then stats to create /group/var/stat in file
+      // create vertical bin variable
+      netCDF::NcVar zbins = ncFile.addVar("verticalBin", netCDF::ncString, zDim);
+      for (int ibin = 0; ibin < bins_z.size(); ibin++) {
+        std::vector<size_t> idxbin;
+        idxbin.push_back(ibin);
+        zbins.putVar(idxbin, bins_z[ibin]);
+      }
+
+      // loop over group, then variables, then stats to create byDomains/group/var/stat in file
+      netCDF::NcGroup domaingroup = ncFile.addGroup("byDomains");
       for (int g = 0; g < groups.size(); g++) {
         // create group group
-        netCDF::NcGroup group = ncFile.addGroup(groups[g]);
+        netCDF::NcGroup group = domaingroup.addGroup(groups[g]);
         // loop over variables
         for (int var = 0; var < variables.size(); var++) {
           // create variable group
@@ -60,22 +94,49 @@ namespace dautils {
           for (int s = 0; s < stats.size(); s++) {
             netCDF::NcVar varout;
             if (stats[s] == "count") {
-              varout = group2.addVar(stats[s], netCDF::ncInt, dimVector);
+              varout = group2.addVar(stats[s], netCDF::ncInt, domainDimVector);
             } else {
-              varout = group2.addVar(stats[s], netCDF::ncFloat, dimVector);
+              varout = group2.addVar(stats[s], netCDF::ncFloat, domainDimVector);
+              varout.putAtt("_FillValue", netCDF::ncFloat, fillVal_);
             }
           }
         }
       }
+
+      // loop over group, then variables, then stats to create griddedBins/group/var/stat in file
+      if (nbins_x > 0 || nbins_y > 0) {
+        netCDF::NcGroup bingroup = ncFile.addGroup("griddedBins");
+        for (int g = 0; g < groups.size(); g++) {
+          // create group group
+          netCDF::NcGroup group = bingroup.addGroup(groups[g]);
+          // loop over variables
+          for (int var = 0; var < variables.size(); var++) {
+            // create variable group
+            netCDF::NcGroup group2 = group.addGroup(variables[var]);
+            // loop over statistics to write out
+            for (int s = 0; s < stats.size(); s++) {
+              netCDF::NcVar varout;
+              if (stats[s] == "count") {
+                varout = group2.addVar(stats[s], netCDF::ncInt, binningDimVector);
+              } else {
+                varout = group2.addVar(stats[s], netCDF::ncFloat, binningDimVector);
+                varout.putAtt("_FillValue", netCDF::ncFloat, fillVal_);
+              }
+            }
+          }
+        }        
+      }
+
       oops::Log::info() << "Output file " << filename << " has been created." << std::endl;
       return 0;
     };
 
     // Overloaded write methods
-    int write(const std::string filename, const std::string group, const std::string variable,
+    int writeByDomains(const std::string filename, const std::string group, const std::string variable,
               const std::string stat, const int idom, const std::vector<int> intvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
-      netCDF::NcGroup outgroup1 = ncFile.getGroup(group);
+      netCDF::NcGroup domaingroup = ncFile.getGroup("byDomains");
+      netCDF::NcGroup outgroup1 = domaingroup.getGroup(group);
       netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
       netCDF::NcVar outvar = outgroup2.getVar(stat);
       std::vector<size_t> idxout;
@@ -85,10 +146,11 @@ namespace dautils {
       return 0;
     };
 
-    int write(const std::string filename, const std::string group, const std::string variable,
+    int writeByDomains(const std::string filename, const std::string group, const std::string variable,
               const std::string stat, const int idom, const std::vector<float> floatvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
-      netCDF::NcGroup outgroup1 = ncFile.getGroup(group);
+      netCDF::NcGroup domaingroup = ncFile.getGroup("byDomains");
+      netCDF::NcGroup outgroup1 = domaingroup.getGroup(group);
       netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
       netCDF::NcVar outvar = outgroup2.getVar(stat);
       std::vector<size_t> idxout;
@@ -97,5 +159,60 @@ namespace dautils {
       outvar.putVar(idxout, floatvals[0]);
       return 0;
     };
+
+    int writeByBins(const std::string filename, const std::string group, const std::string variable,
+              const std::string stat, const int ibin, const int ny, const int nx,
+              const std::vector<std::vector<int>> intvals) {
+      netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
+      netCDF::NcGroup bingroup = ncFile.getGroup("griddedBins");
+      netCDF::NcGroup outgroup1 = bingroup.getGroup(group);
+      netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
+      netCDF::NcVar outvar = outgroup2.getVar(stat);
+      std::vector<size_t> idxout;
+      std::vector<size_t> countout;
+      int idxtmp = 0;
+      idxout.push_back(0);
+      idxout.push_back(ibin);
+      idxout.push_back(0);
+      idxout.push_back(0);
+      countout.push_back(1);
+      countout.push_back(1);
+      countout.push_back(1);
+      countout.push_back(nx);
+      for (auto i: intvals) {
+        idxout[2] = idxtmp;
+        outvar.putVar(idxout, countout, i.data());
+        ++idxtmp;
+      }
+      return 0;
+    };
+
+    int writeByBins(const std::string filename, const std::string group, const std::string variable,
+              const std::string stat, const int ibin, const int ny, const int nx,
+              const std::vector<std::vector<float>> floatvals) {
+      netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
+      netCDF::NcGroup bingroup = ncFile.getGroup("griddedBins");
+      netCDF::NcGroup outgroup1 = bingroup.getGroup(group);
+      netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
+      netCDF::NcVar outvar = outgroup2.getVar(stat);
+      std::vector<size_t> idxout;
+      std::vector<size_t> countout;
+      int idxtmp = 0;
+      idxout.push_back(0);
+      idxout.push_back(ibin);
+      idxout.push_back(0);
+      idxout.push_back(0);
+      countout.push_back(1);
+      countout.push_back(1);
+      countout.push_back(1);
+      countout.push_back(nx);
+      for (auto i: floatvals) {
+        idxout[2] = idxtmp;
+        outvar.putVar(idxout, countout, i.data());
+        ++idxtmp;
+      }
+      return 0;
+    };
+
   };
 }  // namespace dautils

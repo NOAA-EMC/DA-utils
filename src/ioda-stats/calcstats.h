@@ -45,6 +45,8 @@ namespace dautils {
         }
         if (count > 0) {
           mean = sum / count;
+        } else {
+          mean = fillVal_;
         }
         means.push_back(mean);
       } else {
@@ -85,6 +87,8 @@ namespace dautils {
         }
         if (count > 0) {
           rms = sqrt(sum / count);
+        } else {
+          rms = fillVal_;
         }
         rmsvals.push_back(rms);
       } else {
@@ -112,7 +116,7 @@ namespace dautils {
     std::vector<int> update_mask(std::vector<float> maskvalues, float minval, float maxval, const std::vector<int>& inputMask) {
       std::vector<int> updatedMask = inputMask;
       for (int i = 0; i < maskvalues.size(); i++) {
-        if (maskvalues[i] < minval || maskvalues[i] > maxval) {
+        if (maskvalues[i] < minval || maskvalues[i] >= maxval) {
           updatedMask[i] = 1;
         }
       }
