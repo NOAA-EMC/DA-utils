@@ -158,30 +158,56 @@ namespace dautils {
     };
 
     int writeByBins(const std::string filename, const std::string group, const std::string variable,
-              const std::string stat, const int ibin, const std::vector<int> intvals) {
+              const std::string stat, const int ibin, const int ny, const int nx,
+              const std::vector<std::vector<int>> intvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
       netCDF::NcGroup bingroup = ncFile.getGroup("griddedBins");
       netCDF::NcGroup outgroup1 = bingroup.getGroup(group);
       netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
       netCDF::NcVar outvar = outgroup2.getVar(stat);
       std::vector<size_t> idxout;
+      std::vector<size_t> countout;
+      int idxtmp = 0;
       idxout.push_back(0);
       idxout.push_back(ibin);
-      outvar.putVar(idxout, intvals[0]);
+      idxout.push_back(0);
+      idxout.push_back(0);
+      countout.push_back(1);
+      countout.push_back(1);
+      countout.push_back(1);
+      countout.push_back(nx);
+      for (auto i: intvals) {
+        idxout[2] = idxtmp;
+        outvar.putVar(idxout, countout, i.data());
+        ++idxtmp;
+      }
       return 0;
     };
 
     int writeByBins(const std::string filename, const std::string group, const std::string variable,
-              const std::string stat, const int ibin, const std::vector<float> floatvals) {
+              const std::string stat, const int ibin, const int ny, const int nx,
+              const std::vector<std::vector<float>> floatvals) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::write);
       netCDF::NcGroup bingroup = ncFile.getGroup("griddedBins");
       netCDF::NcGroup outgroup1 = bingroup.getGroup(group);
       netCDF::NcGroup outgroup2 = outgroup1.getGroup(variable);
       netCDF::NcVar outvar = outgroup2.getVar(stat);
       std::vector<size_t> idxout;
+      std::vector<size_t> countout;
+      int idxtmp = 0;
       idxout.push_back(0);
       idxout.push_back(ibin);
-      outvar.putVar(idxout, floatvals[0]);
+      idxout.push_back(0);
+      idxout.push_back(0);
+      countout.push_back(1);
+      countout.push_back(1);
+      countout.push_back(1);
+      countout.push_back(nx);
+      for (auto i: floatvals) {
+        idxout[2] = idxtmp;
+        outvar.putVar(idxout, countout, i.data());
+        ++idxtmp;
+      }
       return 0;
     };
 

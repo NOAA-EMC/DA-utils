@@ -112,7 +112,7 @@ namespace dautils {
     std::vector<int> update_mask(std::vector<float> maskvalues, float minval, float maxval, const std::vector<int>& inputMask) {
       std::vector<int> updatedMask = inputMask;
       for (int i = 0; i < maskvalues.size(); i++) {
-        if (maskvalues[i] < minval || maskvalues[i] > maxval) {
+        if (maskvalues[i] < minval || maskvalues[i] >= maxval) {
           updatedMask[i] = 1;
         }
       }

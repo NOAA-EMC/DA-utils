@@ -275,10 +275,11 @@ namespace dautils {
               latitudes[ibin] = latitudes[ibin-1] + dx;
             }
             // loop over domains, compute the masks for each
+            oops::Log::info() << "--------------------------------------------" << std::endl;
             std::vector<std::vector<int>> binmask(zBinNames.size() * nbins_x * nbins_y, std::vector<int>(nlocs, 0));
             int ibin = 0;
             for (int idom = 0; idom < zBinNames.size(); idom++ ) {
-              oops::Log::info() << "Now processing binned data for vertical bin " << zBinNames[idom] << std::endl;
+              oops::Log::info() << "Now processing binned data for vertical bin: " << zBinNames[idom] << std::endl;
               oops::Log::info() << "nbins_x: " << nbins_x << " nbins_y: " << nbins_y << std::endl;
               // compute masks for the bins
               ObsStats obstatbinmask;
@@ -293,7 +294,7 @@ namespace dautils {
                   ibin = ix + (iy * nbins_x) + (idom * nbins_x * nbins_y);
                   binmask[ibin] = obstatbinmask.update_mask(zmaskvalues, zBinMaskVals[idom][0], zBinMaskVals[idom][1], binmask[ibin]);
                   binmask[ibin] = obstatbinmask.update_mask(ymaskvalues, latitudes[iy], latitudes[iy+1], binmask[ibin]);
-                  binmask[ibin] = obstatbinmask.update_mask(ymaskvalues, longitudes[ix], longitudes[ix+1], binmask[ibin]);
+                  binmask[ibin] = obstatbinmask.update_mask(xmaskvalues, longitudes[ix], longitudes[ix+1], binmask[ibin]);
                 }
               }
             }
@@ -316,30 +317,41 @@ namespace dautils {
                   ospace.get_db(groups[g], variables[var], buffer, channels);
                   // get the QC group
                   ospace.get_db(qcgroups[g], variables[var], qcflag, channels);
-
                 }
-                // loop over bins
-                for (int ibin = 0; ibin < (zBinNames.size() * nbins_x * nbins_y); ibin++ ) {
-                  // loop over stats
-                  ObsStats obstat;
-                  for (int s = 0; s < stats.size(); s++) {
-                    // Maybe eventually set this up as a factory but for now just do it
-                    // with this old school if/else if way
-                    std::vector<int> intstat;
-                    std::vector<float> floatstat;
-                    if (stats[s] == "count") {
-                      intstat = obstat.getObsCount(buffer, qcflag, channels, binmask[ibin]);
-                    } else if (stats[s] == "mean") {
-                      floatstat = obstat.getMean(buffer, qcflag, channels, binmask[ibin]);
-                    } else if (stats[s] == "RMS") {
-                      floatstat = obstat.getRMS(buffer, qcflag, channels, binmask[ibin]);
+                // loop over stats
+                ObsStats obstat;
+                for (int s = 0; s < stats.size(); s++) {
+                  // loop over bins
+                  for (int idom = 0; idom < zBinNames.size(); idom++ ) {
+                    std::vector<std::vector<float>> fullfloatstat(nbins_y, std::vector<float>(nbins_x,0.0));
+                    std::vector<std::vector<int>> fullintstat(nbins_y, std::vector<int>(nbins_x,0.0));
+                    for (int iy=0; iy < nbins_y; iy++) {
+                      for (int ix=0; ix < nbins_x; ix++) {
+                        ibin = ix + (iy * nbins_x) + (idom * nbins_x * nbins_y);
+                        // Maybe eventually set this up as a factory but for now just do it
+                        // with this old school if/else if way
+                        std::vector<int> intstat;
+                        std::vector<float> floatstat;
+                        if (stats[s] == "count") {
+                          intstat = obstat.getObsCount(buffer, qcflag, channels, binmask[ibin]);
+                        } else if (stats[s] == "mean") {
+                          floatstat = obstat.getMean(buffer, qcflag, channels, binmask[ibin]);
+                        } else if (stats[s] == "RMS") {
+                          floatstat = obstat.getRMS(buffer, qcflag, channels, binmask[ibin]);
+                        }
+                        if (stats[s] == "count") {
+                          fullintstat[iy][ix] = intstat[0];
+                        } else {
+                          fullfloatstat[iy][ix] = floatstat[0];  
+                        }
+                      }
                     }
                     if (stats[s] == "count") {
                       statfile.writeByBins(outfile, groups[g], variables[var],
-                                           stats[s], ibin, intstat);
+                                           stats[s], idom, nbins_y, nbins_x, fullintstat);                  
                     } else {
                       statfile.writeByBins(outfile, groups[g], variables[var],
-                                           stats[s], ibin, floatstat);
+                                           stats[s], idom, nbins_y, nbins_x, fullfloatstat);
                     }
                   }
                 }
