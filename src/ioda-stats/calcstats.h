@@ -45,6 +45,8 @@ namespace dautils {
         }
         if (count > 0) {
           mean = sum / count;
+        } else {
+          mean = fillVal_;
         }
         means.push_back(mean);
       } else {
@@ -85,6 +87,8 @@ namespace dautils {
         }
         if (count > 0) {
           rms = sqrt(sum / count);
+        } else {
+          rms = fillVal_;
         }
         rmsvals.push_back(rms);
       } else {
