@@ -108,8 +108,6 @@ namespace dautils {
           int count(0);
           float rms(0.0);
           double sum(0.0);
-          int _start = ch * _nlocs;
-          int _end = _start + _nlocs;
           for (size_t i = 0; i < _nlocs; ++i) {
             int ii = ch + (i * channels.size());
             if (data[ii] != fillVal_ && qcvals[ii] == 0 && mask[i] == 0) {
