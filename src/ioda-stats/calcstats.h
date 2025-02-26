@@ -22,12 +22,11 @@ namespace dautils {
         counts.push_back(count);
       } else {
         int _nlocs = data.size() / channels.size();
-        int count(0);
         for (int ch = 0; ch < channels.size(); ch++) {
-          int _start = ch * _nlocs;
-          int _end = _start + _nlocs;
-          for (size_t i = _start; i < _end; ++i) {
-            if (data[i] != fillVal_ && qcvals[i] == 0 && mask[i-_start] == 0) {
+          int count(0);
+          for (size_t i = 0; i < _nlocs; ++i) {
+            int ii = ch + (i * channels.size());
+            if (data[ii] != fillVal_ && qcvals[ii] == 0 && mask[i] == 0) {
               count += 1;
             }
           }
@@ -45,7 +44,7 @@ namespace dautils {
       if (channels.empty()) {
         int count(0);
         float mean(0.0);
-        float sum(0.0);
+        double sum(0.0);
         for (size_t i = 0; i < data.size(); ++i) {
           if (data[i] != fillVal_ && qcvals[i] == 0 && mask[i] == 0) {
             count += 1;
@@ -63,13 +62,12 @@ namespace dautils {
         for (int ch = 0; ch < channels.size(); ch++) {
           int count(0);
           float mean(0.0);
-          float sum(0.0);
-          int _start = ch * _nlocs;
-          int _end = _start + _nlocs;
-          for (size_t i = _start; i < _end; ++i) {
-            if (data[i] != fillVal_ && qcvals[i] == 0 && mask[i-_start] == 0) {
+          double sum(0.0);
+          for (size_t i = 0; i < _nlocs; ++i) {
+            int ii = ch + (i * channels.size());
+            if (data[ii] != fillVal_ && qcvals[ii] == 0 && mask[i] == 0) {
               count += 1;
-              sum += data[i];
+              sum += data[ii];
             }
           }
           if (count > 0) {
@@ -91,7 +89,7 @@ namespace dautils {
       if (channels.empty()) {
         int count(0);
         float rms(0.0);
-        float sum(0.0);
+        double sum(0.0);
         for (size_t i = 0; i < data.size(); ++i) {
           if (data[i] != fillVal_ && qcvals[i] == 0 && mask[i] == 0) {
             count += 1;
@@ -109,13 +107,14 @@ namespace dautils {
         for (int ch = 0; ch < channels.size(); ch++) {
           int count(0);
           float rms(0.0);
-          float sum(0.0);
+          double sum(0.0);
           int _start = ch * _nlocs;
           int _end = _start + _nlocs;
-          for (size_t i = _start; i < _end; ++i) {
-            if (data[i] != fillVal_ && qcvals[i] == 0 && mask[i-_start] == 0) {
+          for (size_t i = 0; i < _nlocs; ++i) {
+            int ii = ch + (i * channels.size());
+            if (data[ii] != fillVal_ && qcvals[ii] == 0 && mask[i] == 0) {
               count += 1;
-              sum += pow(data[i], 2);
+              sum += pow(data[ii], 2);
             }
           }
           if (count > 0) {
