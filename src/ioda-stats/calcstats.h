@@ -21,8 +21,16 @@ namespace dautils {
         }
         counts.push_back(count);
       } else {
+        int _nlocs = data.size() / channels.size();
         for (int ch = 0; ch < channels.size(); ch++) {
-          oops::Log::info() << ch << std::endl;
+          int count(0);
+          for (size_t i = 0; i < _nlocs; ++i) {
+            int ii = ch + (i * channels.size());
+            if (data[ii] != fillVal_ && qcvals[ii] == 0 && mask[i] == 0) {
+              count += 1;
+            }
+          }
+          counts.push_back(count);
         }
       }
       return counts;
@@ -36,7 +44,7 @@ namespace dautils {
       if (channels.empty()) {
         int count(0);
         float mean(0.0);
-        float sum(0.0);
+        double sum(0.0);
         for (size_t i = 0; i < data.size(); ++i) {
           if (data[i] != fillVal_ && qcvals[i] == 0 && mask[i] == 0) {
             count += 1;
@@ -50,23 +58,26 @@ namespace dautils {
         }
         means.push_back(mean);
       } else {
+        int _nlocs = data.size() / channels.size();
         for (int ch = 0; ch < channels.size(); ch++) {
-          oops::Log::info() << ch << std::endl;
+          int count(0);
+          float mean(0.0);
+          double sum(0.0);
+          for (size_t i = 0; i < _nlocs; ++i) {
+            int ii = ch + (i * channels.size());
+            if (data[ii] != fillVal_ && qcvals[ii] == 0 && mask[i] == 0) {
+              count += 1;
+              sum += data[ii];
+            }
+          }
+          if (count > 0) {
+            mean = sum / count;
+          } else {
+            mean = fillVal_;
+          }
+          means.push_back(mean);
         }
       }
-    //   if (channels.empty()) {
-    //     int count(0);
-    //     for (size_t i = 0; i < data.size(); ++i) {
-    //       if (data[i] != fillVal_ && qcvals[i] == 0) {
-    //         count += 1;
-    //       }
-    //     }
-    //     counts.push_back(count);
-    //   } else {
-    //     for (int ch = 0; ch < channels.size(); ch++) {
-    //       oops::Log::info() << ch << std::endl;
-    //     }
-    //   }
       return means;
     }
     // -----------------------------------------------------------------------------
@@ -78,7 +89,7 @@ namespace dautils {
       if (channels.empty()) {
         int count(0);
         float rms(0.0);
-        float sum(0.0);
+        double sum(0.0);
         for (size_t i = 0; i < data.size(); ++i) {
           if (data[i] != fillVal_ && qcvals[i] == 0 && mask[i] == 0) {
             count += 1;
@@ -92,23 +103,26 @@ namespace dautils {
         }
         rmsvals.push_back(rms);
       } else {
+        int _nlocs = data.size() / channels.size();
         for (int ch = 0; ch < channels.size(); ch++) {
-          oops::Log::info() << ch << std::endl;
+          int count(0);
+          float rms(0.0);
+          double sum(0.0);
+          for (size_t i = 0; i < _nlocs; ++i) {
+            int ii = ch + (i * channels.size());
+            if (data[ii] != fillVal_ && qcvals[ii] == 0 && mask[i] == 0) {
+              count += 1;
+              sum += pow(data[ii], 2);
+            }
+          }
+          if (count > 0) {
+            rms = sqrt(sum / count);
+          } else {
+            rms = fillVal_;
+          }
+          rmsvals.push_back(rms);
         }
       }
-    //   if (channels.empty()) {
-    //     int count(0);
-    //     for (size_t i = 0; i < data.size(); ++i) {
-    //       if (data[i] != fillVal_ && qcvals[i] == 0) {
-    //         count += 1;
-    //       }
-    //     }
-    //     counts.push_back(count);
-    //   } else {
-    //     for (int ch = 0; ch < channels.size(); ch++) {
-    //       oops::Log::info() << ch << std::endl;
-    //     }
-    //   }
       return rmsvals;
     }
     // -----------------------------------------------------------------------------

@@ -39,7 +39,6 @@ namespace dautils {
       if (nbins_x > 0 || nbins_y > 0) {
         binningDimVector.push_back(tDim);
         if (!channels.empty()) {
-          cDim = ncFile.addDim("Channel", channels.size());
           binningDimVector.push_back(cDim);
         } else {
           zDim = ncFile.addDim("binsZDim", bins_z.size());
@@ -74,11 +73,13 @@ namespace dautils {
       }
 
       // create vertical bin variable
-      netCDF::NcVar zbins = ncFile.addVar("verticalBin", netCDF::ncString, zDim);
-      for (int ibin = 0; ibin < bins_z.size(); ibin++) {
-        std::vector<size_t> idxbin;
-        idxbin.push_back(ibin);
-        zbins.putVar(idxbin, bins_z[ibin]);
+      if (channels.empty()) {
+        netCDF::NcVar zbins = ncFile.addVar("verticalBin", netCDF::ncString, zDim);
+        for (int ibin = 0; ibin < bins_z.size(); ibin++) {
+          std::vector<size_t> idxbin;
+          idxbin.push_back(ibin);
+          zbins.putVar(idxbin, bins_z[ibin]);
+        }
       }
 
       // loop over group, then variables, then stats to create byDomains/group/var/stat in file
@@ -142,7 +143,16 @@ namespace dautils {
       std::vector<size_t> idxout;
       idxout.push_back(0);
       idxout.push_back(idom);
-      outvar.putVar(idxout, intvals[0]);
+      if (intvals.size() > 1) {
+        idxout.push_back(0);
+        std::vector<size_t> countout;
+        countout.push_back(1);
+        countout.push_back(1);
+        countout.push_back(intvals.size());
+        outvar.putVar(idxout, countout, intvals.data());
+      } else {
+        outvar.putVar(idxout, intvals[0]);
+      }
       return 0;
     };
 
@@ -156,7 +166,16 @@ namespace dautils {
       std::vector<size_t> idxout;
       idxout.push_back(0);
       idxout.push_back(idom);
-      outvar.putVar(idxout, floatvals[0]);
+      if (floatvals.size() > 1) {
+        idxout.push_back(0);
+        std::vector<size_t> countout;
+        countout.push_back(1);
+        countout.push_back(1);
+        countout.push_back(floatvals.size());
+        outvar.putVar(idxout, countout, floatvals.data());
+      } else {
+        outvar.putVar(idxout, floatvals[0]);
+      }
       return 0;
     };
 
