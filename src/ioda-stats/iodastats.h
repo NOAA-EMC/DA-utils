@@ -73,6 +73,10 @@ namespace dautils {
           ioda::ObsSpace ospace(obsConfig, mycomm, timeWindow, mycomm);
           const size_t nlocs = ospace.nlocs();
           oops::Log::info() << obsFile << ": nlocs =" << nlocs << std::endl;
+          if (nlocs == 0) {
+            oops::Log::info() << "ObsSpace is empty, skipping " << obsFile << std::endl;
+            continue;
+          }
 
           // get the list of variables (and channels if applicable) to process
           std::vector<std::string> variables;
