@@ -41,8 +41,10 @@ namespace dautils {
         if (!channels.empty()) {
           binningDimVector.push_back(cDim);
         } else {
-          zDim = ncFile.addDim("binsZDim", bins_z.size());
-          binningDimVector.push_back(zDim);
+          if (bins_z.size() > 0) {
+            zDim = ncFile.addDim("binsZDim", bins_z.size());
+            binningDimVector.push_back(zDim);
+          }
         }
       }
 
@@ -73,7 +75,7 @@ namespace dautils {
       }
 
       // create vertical bin variable
-      if (channels.empty()) {
+      if (channels.empty() && bins_z.size() > 0) {
         netCDF::NcVar zbins = ncFile.addVar("verticalBin", netCDF::ncString, zDim);
         for (int ibin = 0; ibin < bins_z.size(); ibin++) {
           std::vector<size_t> idxbin;
@@ -125,7 +127,7 @@ namespace dautils {
               }
             }
           }
-        }        
+        }
       }
 
       oops::Log::info() << "Output file " << filename << " has been created." << std::endl;
