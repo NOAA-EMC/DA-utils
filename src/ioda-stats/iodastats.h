@@ -172,6 +172,13 @@ namespace dautils {
           // assert that the QC groups list is the same size as groups
           assert(groups.size() == qcgroups.size());
 
+          // if the zBins are empty, create a dummy one for 'all'
+          if (zBinNames.size() == 0){
+            zBinNames.push_back("all");
+            zBinMaskVar.push_back("latitude");
+            zBinMaskVals.push_back(std::vector<float> {-90.0f, 90.0f});
+          }
+
           // initialize netCDF output file for writing
           std::string outfile;
           obsSpace.get("output file", outfile);
@@ -266,11 +273,22 @@ namespace dautils {
           // now, compute stats over binned regions, if applicable
           // --------------------------------------------------------------------------
           if (obsSpace.has("regular grid binning")) {
+            // figure out if we are 0-360 or -180-180 longitudes
+            eckit::LocalConfiguration binConfig;
+            obsSpace.get("regular grid binning", binConfig);
+            bool negLon = false;
+            if (binConfig.has("use negative longitudes")) {
+              binConfig.get("use negative longitudes", negLon);
+            }
             // get lat/lon ranges based on bin sizes
             std::vector<float> longitudes(nbins_x+1);
             std::vector<float> latitudes(nbins_y+1);
             float dx = 360.0 / float(nbins_x);
-            longitudes[0] = 0.0;
+            if (negLon) {
+              longitudes[0] = -180.0;
+            } else {
+              longitudes[0] = 0.0;
+            }
             latitudes[0] = -90.0;
             for (int ibin = 1; ibin < nbins_x+1; ibin++ ) {
               longitudes[ibin] = longitudes[ibin-1] + dx;
@@ -278,6 +296,7 @@ namespace dautils {
             for (int ibin = 1; ibin < nbins_y+1; ibin++ ) {
               latitudes[ibin] = latitudes[ibin-1] + dx;
             }
+
             // loop over domains, compute the masks for each
             oops::Log::info() << "--------------------------------------------" << std::endl;
             int nzbins;
@@ -289,7 +308,7 @@ namespace dautils {
             std::vector<std::vector<int>> binmask(nzbins * nbins_x * nbins_y, std::vector<int>(nlocs, 0));
             if (channels.empty()) { // use vertical bins
               int ibin = 0;
-              for (int idom = 0; idom < zBinNames.size(); idom++ ) {
+              for (int idom = 0; idom < nzbins; idom++ ) {
                 oops::Log::info() << "Now processing binned data for vertical bin: " << zBinNames[idom] << std::endl;
                 oops::Log::info() << "nbins_x: " << nbins_x << " nbins_y: " << nbins_y << std::endl;
                 // compute masks for the bins
@@ -351,7 +370,7 @@ namespace dautils {
                   if (channels.empty()) {
                     // loop over bins
                     int ibin = 0;
-                    for (int idom = 0; idom < zBinNames.size(); idom++ ) {
+                    for (int idom = 0; idom < nzbins; idom++ ) {
                       std::vector<std::vector<float>> fullfloatstat(nbins_y, std::vector<float>(nbins_x,0.0));
                       std::vector<std::vector<int>> fullintstat(nbins_y, std::vector<int>(nbins_x,0.0));
                       for (int iy=0; iy < nbins_y; iy++) {
@@ -371,7 +390,7 @@ namespace dautils {
                           if (stats[s] == "count") {
                             fullintstat[iy][ix] = intstat[0];
                           } else {
-                            fullfloatstat[iy][ix] = floatstat[0];  
+                            fullfloatstat[iy][ix] = floatstat[0];
                           }
                         }
                       }
