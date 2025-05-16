@@ -16,6 +16,8 @@ jobs:
 
     - name: Build DA-Utils in a bundle
       run: |
+        export jedi_cmake_ROOT=/opt/view
+        source /etc/profile.d/z10_spack_environment.sh
         cd $GITHUB_WORKSPACE
         mkdir Build
         cd Build
