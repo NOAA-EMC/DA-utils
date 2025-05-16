@@ -15,6 +15,7 @@ jobs:
         submodules: recursive
 
     - name: Build DA-Utils in a bundle
+      shell: bash
       run: |
         export jedi_cmake_ROOT=/opt/view
         source /etc/profile.d/z10_spack_environment.sh
