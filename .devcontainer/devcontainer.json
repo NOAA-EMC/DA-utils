@@ -1,0 +1,4 @@
+{
+  "name": "JCSDA GNU dev codespace",
+  "image": "jcsda/docker-gnu-openmpi-dev"
+}
