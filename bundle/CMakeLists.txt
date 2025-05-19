@@ -43,12 +43,17 @@ list( APPEND CMAKE_INSTALL_RPATH ${CMAKE_CURRENT_BINARY_DIR}/fv3 )
 
 # Handle user options
 option(BUILD_REGRID_STATES "Build regrid states land DA utility" ON)
+option(CLONE_JCSDA_REPOS "Clone OOPS and IODA" OFF)
 
 # Initialize bundle
 # -----------------
 ecbuild_bundle_initialize()
 
 ecbuild_bundle( PROJECT da-utils SOURCE "../" )
+if (CLONE_JCSDA_REPOS)
+  ecbuild_bundle( PROJECT oops     GIT "https://github.com/jcsda/oops.git"        BRANCH develop UPDATE )
+  ecbuild_bundle( PROJECT ioda     GIT "https://github.com/jcsda/ioda.git"        BRANCH develop UPDATE )
+endif()
 # Finalize bundle
 # ---------------
 ecbuild_bundle_finalize()
