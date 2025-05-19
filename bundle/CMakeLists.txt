@@ -49,11 +49,12 @@ option(CLONE_JCSDA_REPOS "Clone OOPS and IODA" OFF)
 # -----------------
 ecbuild_bundle_initialize()
 
-ecbuild_bundle( PROJECT da-utils SOURCE "../" )
 if (CLONE_JCSDA_REPOS)
   ecbuild_bundle( PROJECT oops     GIT "https://github.com/jcsda/oops.git"        BRANCH develop UPDATE )
   ecbuild_bundle( PROJECT ioda     GIT "https://github.com/jcsda/ioda.git"        BRANCH develop UPDATE )
 endif()
+
+ecbuild_bundle( PROJECT da-utils SOURCE "../" )
 # Finalize bundle
 # ---------------
 ecbuild_bundle_finalize()
