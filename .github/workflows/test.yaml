@@ -20,7 +20,7 @@ jobs:
         export jedi_cmake_ROOT=/opt/view
         source /opt/spack-environment/activate.sh
         cd $GITHUB_WORKSPACE
-        mkdir Build
+        mkdir -p Build
         cd Build
         ecbuild -DCLONE_JCSDA_REPOS=ON ../da-utils/bundle
         make -j4
