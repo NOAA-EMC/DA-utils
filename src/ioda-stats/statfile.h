@@ -75,7 +75,7 @@ namespace dautils {
       }
 
       // create vertical bin variable
-      if (channels.empty() && bins_z.size() > 0) {
+      if (channels.empty() && bins_z.size() > 0 && (nbins_x > 0 || nbins_y > 0)) {
         netCDF::NcVar zbins = ncFile.addVar("verticalBin", netCDF::ncString, zDim);
         for (int ibin = 0; ibin < bins_z.size(); ibin++) {
           std::vector<size_t> idxbin;
