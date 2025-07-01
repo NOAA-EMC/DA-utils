@@ -188,6 +188,8 @@ void dautils::IodaStatsDriver::run() {
         std::vector<std::vector<int>> mask(domains.size()+1, std::vector<int>(nlocs, 0));
         for (int idom = 0; idom < domains.size(); idom++ ) {
             // compute mask with function 3 times, one for each possible mask
+            // TODO(CoryMartin-NOAA) there is no need to call a method here from an object
+            // just make this a function inside the namepsace...
             ObsStats obstatmask;
             std::vector<float> maskvalues(nlocs);
             if (!domainMaskVar1[idom].empty()) {
@@ -224,6 +226,9 @@ void dautils::IodaStatsDriver::run() {
                 }
                 // loop over domains
                 for (int idom = 0; idom < domains.size()+1; idom++ ) {
+                    // TODO(CoryMartin-NOAA) Create an obsstats object,
+                    // in the constructor, pass it data, and then
+                    // the methods just return the individual statistics
                     // loop over stats
                     for (int s = 0; s < stats.size(); s++) {
                         
