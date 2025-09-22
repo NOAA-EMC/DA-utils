@@ -239,34 +239,37 @@ namespace dautils {
       std::vector<std::string> variables;
       
       try {
-        // For now, we'll try a set of common observation variables
-        // In a full implementation, we would use IODA API to introspect the file
-        // but this requires more detailed knowledge of the IODA internals
+        // Get the underlying ObsGroup from the ObsSpace
+        const ioda::ObsGroup& obsGroup = ospace.getObsGroup();
         
-        std::vector<std::string> candidateVars = {
-          "brightnessTemperature", "temperature", "humidity", "windSpeed", 
-          "windDirection", "pressure", "seaSurfaceTemperature", "oceanDepth",
-          "radiance", "reflectance", "altitude", "thickness", "waterVaporMixingRatio",
-          "specificHumidity", "airTemperature", "virtualTemperature"
-        };
-        
-        for (const auto& var : candidateVars) {
-          try {
-            // Try to read a small amount of data to see if variable exists
-            size_t testSize = std::min(static_cast<size_t>(1), ospace.nlocs());
-            if (testSize > 0) {
-              std::vector<float> buffer(testSize);
-              ospace.get_db("ObsValue", var, buffer);
-              variables.push_back(var);
+        // Try to open the ObsValue group
+        try {
+          ioda::Group obsValueGroup = obsGroup.open("ObsValue");
+          
+          // Get the list of all variables in the ObsValue group
+          std::vector<std::string> allVars = obsValueGroup.vars.list();
+          
+          for (const auto& varName : allVars) {
+            // Skip dimension scales (these are not observation variables)
+            // Dimension scales are typically named like the dimensions (nlocs, nchans, etc.)
+            if (varName != "nlocs" && varName != "nchans" && 
+                varName != "nstring" && varName != "nvars") {
+              variables.push_back(varName);
             }
-          } catch (...) {
-            // Variable doesn't exist or can't be read, skip it
           }
+          
+          oops::Log::info() << "Found " << variables.size() << " ObsValue variables in file" << std::endl;
+          
+        } catch (const std::exception& e) {
+          // ObsValue group doesn't exist or can't be opened
+          oops::Log::warning() << "Could not access ObsValue group: " << e.what() << std::endl;
+          variables.push_back("(ObsValue group not accessible)");
         }
         
-      } catch (...) {
-        // If we can't access variables this way, add a note
-        variables.push_back("(introspection failed - may need specific configuration)");
+      } catch (const std::exception& e) {
+        // ObsGroup access failed
+        oops::Log::warning() << "Could not access ObsGroup: " << e.what() << std::endl;
+        variables.push_back("(ObsGroup not accessible)");
       }
       
       return variables;
