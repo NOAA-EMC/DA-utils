@@ -1,0 +1,13 @@
+# Test configuration for IODA dump utility
+time window:
+  begin: 2000-01-01T00:00:00Z
+  end: 2030-12-31T23:59:59Z
+  bound to include: begin
+
+# Input can be either a directory or a list of files
+# For testing, we'll use the same file as the meanioda test
+input files:
+  - ../../../sorc/soca/test/Data/obs/gmi_gpm_obs.nc
+
+# Output file for the summary
+output file: testrun/ioda_summary.txt

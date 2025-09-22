@@ -10,6 +10,7 @@ endfunction(CREATE_SYMLINK)
 # Create Data directory for test input config and symlink all files
 list( APPEND utils_test_input
   testinput/meanioda.yaml
+  testinput/iodadump.yaml
 )
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testinput)
@@ -23,5 +24,11 @@ if ( oops_FOUND )
   ecbuild_add_test( TARGET  test_dautils_ioda_example
                     COMMAND ${CMAKE_BINARY_DIR}/bin/meanioda.x
                     ARGS    "testinput/meanioda.yaml"
+                    LIBS    da-utils)
+
+  # Test IODA dump utility that creates summary reports
+  ecbuild_add_test( TARGET  test_dautils_ioda_dump
+                    COMMAND ${CMAKE_BINARY_DIR}/bin/iodadump.x
+                    ARGS    "testinput/iodadump.yaml"
                     LIBS    da-utils)
 endif()
