@@ -209,6 +209,7 @@ namespace dautils {
       try {
         // create a minimal configuration for this file
         eckit::LocalConfiguration obsConfig;
+        obsConfig.set("name", "ioda_dump_obsspace");
         obsConfig.set("obsdatain.engine.type", "H5File");
         obsConfig.set("obsdatain.engine.obsfile", filename);
         obsConfig.set("simulated variables", std::vector<std::string>{"dummy"});
