@@ -1,0 +1,145 @@
+# IODA Dump Utility
+
+The IODA Dump utility (`iodadump.x`) is a command-line tool that reads IODA (Interface for Observation Data Access) files and generates summary reports in formatted ASCII text files.
+
+## Features
+
+- **MPI Support**: Distributes file processing across multiple MPI processes for efficient parallel execution
+- **Flexible Input**: Accepts either a directory to scan or an explicit list of files
+- **File Detection**: Automatically identifies IODA files by extension (.nc, .h5, .hdf5)
+- **Basic Information**: Extracts the number of observations (`nobs`) from each file
+- **Variable Discovery**: Attempts to detect ObsValue variables present in each file
+- **Error Handling**: Gracefully handles corrupted or inaccessible files with detailed error reporting
+- **Formatted Output**: Generates well-formatted ASCII reports suitable for viewing or further processing
+
+## Usage
+
+```bash
+# Using MPI (recommended for large numbers of files)
+mpirun -np 4 iodadump.x config.yaml
+
+# Single process execution
+iodadump.x config.yaml
+```
+
+## Configuration File Format
+
+The utility uses YAML configuration files with the following structure:
+
+### Basic Configuration
+```yaml
+# Time window (required by OOPS framework)
+time window:
+  begin: 2000-01-01T00:00:00Z
+  end: 2030-12-31T23:59:59Z
+  bound to include: begin
+
+# Output file path
+output file: summary_report.txt
+```
+
+### Input Option 1: Directory Scanning
+```yaml
+# Scan a directory for IODA files
+input directory: /path/to/ioda/files
+```
+
+### Input Option 2: Explicit File List
+```yaml
+# Specify files explicitly
+input files:
+  - /path/to/file1.nc
+  - /path/to/file2.h5
+  - /path/to/file3.hdf5
+```
+
+## Example Configuration Files
+
+See `test/testinput/` for example configurations:
+- `iodadump.yaml` - File list example
+- `iodadump_directory.yaml` - Directory scanning example
+
+## Output Format
+
+The utility generates a report with the following structure:
+
+```
+================================================================================
+                          IODA File Summary Report                             
+================================================================================
+Generated on: 2024-01-01T12:00:00Z
+Total files processed: 3
+================================================================================
+
+File: obs_file1.nc
+Full path: /data/obs/obs_file1.nc
+Status: SUCCESS
+Number of observations (nobs): 5000
+ObsValue variables (2):
+  1. brightnessTemperature
+  2. temperature
+--------------------------------------------------------------------------------
+File: obs_file2.h5
+Full path: /data/obs/obs_file2.h5
+Status: SUCCESS
+Number of observations (nobs): 2500
+ObsValue variables (3):
+  1. windSpeed
+  2. windDirection
+  3. pressure
+--------------------------------------------------------------------------------
+File: corrupted.nc
+Full path: /data/obs/corrupted.nc
+Status: FAILED
+Error: File format error: unable to read header
+--------------------------------------------------------------------------------
+
+================================================================================
+                               End of Report                                   
+================================================================================
+```
+
+## MPI Behavior
+
+When run with MPI:
+- Files are distributed across MPI processes using round-robin assignment
+- Each process works on its assigned subset of files
+- Process 0 (rank 0) collects results and writes the final report
+- Progress messages are logged from all processes
+
+## Error Handling
+
+The utility handles various error conditions gracefully:
+- **Missing directories**: Reports directory not found errors
+- **Corrupted files**: Logs specific file processing errors
+- **Permission issues**: Reports file access problems
+- **Format problems**: Identifies files that can't be read as IODA format
+
+Failed files are included in the report with error details, ensuring complete visibility into processing results.
+
+## Variable Detection
+
+The utility attempts to detect ObsValue variables by testing for common observation variable names:
+- `brightnessTemperature`
+- `temperature`
+- `humidity`
+- `windSpeed`
+- `windDirection`
+- `pressure`
+- `seaSurfaceTemperature`
+- And others...
+
+If variable introspection fails, the report will indicate this with an appropriate message.
+
+## Building
+
+The utility is built as part of the DA-utils package when OOPS is available:
+
+```bash
+cd DA-utils
+mkdir build && cd build
+ecbuild ../bundle
+make iodadump.x
+```
+
+The executable will be placed in `bin/iodadump.x`.

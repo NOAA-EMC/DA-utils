@@ -11,6 +11,7 @@ endfunction(CREATE_SYMLINK)
 list( APPEND utils_test_input
   testinput/meanioda.yaml
   testinput/iodadump.yaml
+  testinput/iodadump_directory.yaml
 )
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testinput)

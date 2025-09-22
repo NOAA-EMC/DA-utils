@@ -42,6 +42,9 @@ namespace dautils {
     static const std::string classname() {return "dautils::IodaDump";}
 
     int execute(const eckit::Configuration & fullConfig) const {
+      // Validate configuration first
+      validateConfiguration(fullConfig);
+
       // define the time window
       const eckit::LocalConfiguration timeWindowConf(fullConfig, "time window");
       const util::TimeWindow timeWindow(timeWindowConf);
@@ -55,11 +58,19 @@ namespace dautils {
       if (fullConfig.has("input directory")) {
         std::string inputDir;
         fullConfig.get("input directory", inputDir);
+        oops::Log::info() << "Scanning directory: " << inputDir << std::endl;
         inputFiles = getFilesFromDirectory(inputDir);
+        oops::Log::info() << "Found " << inputFiles.size() << " IODA files in directory" << std::endl;
       } else if (fullConfig.has("input files")) {
         fullConfig.get("input files", inputFiles);
+        oops::Log::info() << "Processing " << inputFiles.size() << " specified files" << std::endl;
       } else {
         throw eckit::Exception("Either 'input directory' or 'input files' must be specified");
+      }
+
+      if (inputFiles.empty()) {
+        oops::Log::warning() << "No input files found to process" << std::endl;
+        return 0;
       }
 
       // get the communicator for just me
@@ -70,9 +81,11 @@ namespace dautils {
       int myrank = getComm().rank();
       
       std::vector<std::string> myFiles;
-      for (int i = myrank; i < inputFiles.size(); i += nprocs) {
+      for (size_t i = myrank; i < inputFiles.size(); i += nprocs) {
         myFiles.push_back(inputFiles[i]);
       }
+
+      oops::Log::info() << "Process " << myrank << " will process " << myFiles.size() << " files" << std::endl;
 
       // process my files
       std::vector<FileInfo> fileInfos;
@@ -82,6 +95,13 @@ namespace dautils {
           fileInfos.push_back(info);
         } catch (const std::exception& e) {
           oops::Log::warning() << "Failed to process file " << file << ": " << e.what() << std::endl;
+          // Add failed file info
+          FileInfo failedInfo;
+          failedInfo.filename = file;
+          failedInfo.nobs = 0;
+          failedInfo.success = false;
+          failedInfo.errorMsg = e.what();
+          fileInfos.push_back(failedInfo);
         }
       }
 
@@ -107,6 +127,25 @@ namespace dautils {
 
     std::string appname() const {
       return "dautils::IodaDump";
+    }
+
+    void validateConfiguration(const eckit::Configuration & fullConfig) const {
+      // Check for required fields
+      if (!fullConfig.has("time window")) {
+        throw eckit::Exception("Configuration must include 'time window' section");
+      }
+      
+      if (!fullConfig.has("output file")) {
+        throw eckit::Exception("Configuration must include 'output file' specification");
+      }
+      
+      if (!fullConfig.has("input directory") && !fullConfig.has("input files")) {
+        throw eckit::Exception("Configuration must include either 'input directory' or 'input files'");
+      }
+      
+      if (fullConfig.has("input directory") && fullConfig.has("input files")) {
+        oops::Log::warning() << "Both 'input directory' and 'input files' specified - using 'input directory'" << std::endl;
+      }
     }
 
     std::vector<std::string> getFilesFromDirectory(const std::string& dir) const {
@@ -220,11 +259,29 @@ namespace dautils {
     }
 
     std::vector<FileInfo> gatherResults(const std::vector<FileInfo>& myResults) const {
-      std::vector<FileInfo> allResults = myResults;
+      std::vector<FileInfo> allResults;
       
-      // In a real MPI implementation, we would gather results from all processes
-      // For now, we'll just return our local results
-      // TODO: Implement proper MPI gathering when needed
+      int myrank = getComm().rank();
+      int nprocs = getComm().size();
+      
+      if (nprocs == 1) {
+        // Single process - just return our results
+        return myResults;
+      }
+      
+      // For MPI implementation, we would need to serialize and gather the results
+      // This is a simplified version that works for single process or when
+      // each process writes its own partial results
+      
+      if (myrank == 0) {
+        // Rank 0 starts with its own results
+        allResults = myResults;
+        
+        // In a full MPI implementation, rank 0 would receive results from other ranks
+        // For now, we'll just use the results from rank 0
+        // TODO: Implement proper MPI_Gather or similar for FileInfo structures
+        oops::Log::info() << "Note: Full MPI result gathering not implemented - only showing results from rank 0" << std::endl;
+      }
       
       return allResults;
     }

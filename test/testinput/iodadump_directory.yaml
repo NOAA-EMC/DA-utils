@@ -1,0 +1,11 @@
+# Test configuration for IODA dump utility (directory mode)
+time window:
+  begin: 2000-01-01T00:00:00Z
+  end: 2030-12-31T23:59:59Z
+  bound to include: begin
+
+# Input directory - utility will scan for .nc, .h5, .hdf5 files
+input directory: /path/to/ioda/files
+
+# Output file for the summary
+output file: testrun/ioda_directory_summary.txt
