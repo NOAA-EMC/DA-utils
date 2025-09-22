@@ -239,9 +239,12 @@ namespace dautils {
       std::vector<std::string> variables;
       
       try {
-        // Try to open the ObsValue group directly from ObsSpace
+        // Get the underlying ObsGroup from the ObsSpace
+        const ioda::ObsGroup& obsGroup = ospace.getObsGroup();
+        
+        // Try to open the ObsValue group
         try {
-          ioda::Group obsValueGroup = ospace.open("ObsValue");
+          ioda::Group obsValueGroup = obsGroup.open("ObsValue");
           
           // Get the list of all variables in the ObsValue group
           std::vector<std::string> allVars = obsValueGroup.vars.list();
