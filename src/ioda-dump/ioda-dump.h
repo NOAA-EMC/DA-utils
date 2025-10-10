@@ -273,7 +273,7 @@ namespace dautils {
       std::vector<size_t> allBufferSizes(nprocs);
       getComm().allGather(myBufferSize, allBufferSizes.begin(), allBufferSizes.end());
       
-      // Prepare for gatherv operation
+      // Calculate total size and displacements for allGatherv
       std::vector<int> recvCounts(nprocs);
       std::vector<int> displs(nprocs);
       size_t totalSize = 0;
@@ -283,14 +283,10 @@ namespace dautils {
         totalSize += allBufferSizes[i];
       }
       
-      // Gather all buffers
-      std::vector<char> allBuffers;
-      if (myrank == 0) {
-        allBuffers.resize(totalSize);
-      }
-      
-      getComm().gatherv(myBuffer.begin(), myBuffer.end(),
-                       allBuffers.begin(), recvCounts.data(), displs.data(), 0);
+      // Use allGatherv to gather all buffers to all ranks
+      std::vector<char> allBuffers(totalSize);
+      getComm().allGatherv(myBuffer.begin(), myBuffer.end(),
+                          allBuffers.begin(), recvCounts.data(), displs.data());
       
       if (myrank == 0) {
         // Rank 0 deserializes all results
