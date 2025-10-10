@@ -233,14 +233,26 @@ namespace dautils {
             std::vector<float> maskvalues(nlocs);
             if (!domainMaskVar1[idom].empty()) {
               ospace.get_db("MetaData", domainMaskVar1[idom], maskvalues);
+              // Convert longitudes if this is a longitude mask
+              if (domainMaskVar1[idom] == "longitude") {
+                convertLongitudes(maskvalues);
+              }
               mask[idom] = obstatmask.update_mask(maskvalues, domainMaskVals1[idom][0], domainMaskVals1[idom][1], mask[idom]);
             }
             if (!domainMaskVar2[idom].empty()) {
               ospace.get_db("MetaData", domainMaskVar2[idom], maskvalues);
+              // Convert longitudes if this is a longitude mask
+              if (domainMaskVar2[idom] == "longitude") {
+                convertLongitudes(maskvalues);
+              }
               mask[idom] = obstatmask.update_mask(maskvalues, domainMaskVals2[idom][0], domainMaskVals2[idom][1], mask[idom]);
             }
             if (!domainMaskVar3[idom].empty()) {
               ospace.get_db("MetaData", domainMaskVar3[idom], maskvalues);
+              // Convert longitudes if this is a longitude mask
+              if (domainMaskVar3[idom] == "longitude") {
+                convertLongitudes(maskvalues);
+              }
               mask[idom] = obstatmask.update_mask(maskvalues, domainMaskVals3[idom][0], domainMaskVals3[idom][1], mask[idom]);
             }
           }
