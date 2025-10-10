@@ -12,6 +12,7 @@
 #include <ctime>
 #include <iomanip>
 #include <sstream>
+#include <cstring>
 
 #include "eckit/config/LocalConfiguration.h"
 #include "eckit/mpi/Comm.h"
@@ -264,21 +265,148 @@ namespace dautils {
         return myResults;
       }
       
-      // For MPI implementation, we would need to serialize and gather the results
-      // This is a simplified version that works for single process or when
-      // each process writes its own partial results
+      // Serialize local results into a buffer
+      std::vector<char> myBuffer = serializeFileInfos(myResults);
+      size_t myBufferSize = myBuffer.size();
+      
+      // Gather buffer sizes from all ranks
+      std::vector<size_t> allBufferSizes(nprocs);
+      getComm().allGather(myBufferSize, allBufferSizes.begin(), allBufferSizes.end());
+      
+      // Calculate total size and displacements for allGatherv
+      std::vector<int> recvCounts(nprocs);
+      std::vector<int> displs(nprocs);
+      size_t totalSize = 0;
+      for (int i = 0; i < nprocs; ++i) {
+        recvCounts[i] = static_cast<int>(allBufferSizes[i]);
+        displs[i] = static_cast<int>(totalSize);
+        totalSize += allBufferSizes[i];
+      }
+      
+      // Use allGatherv to gather all buffers to all ranks
+      std::vector<char> allBuffers(totalSize);
+      getComm().allGatherv(myBuffer.begin(), myBuffer.end(),
+                          allBuffers.begin(), recvCounts.data(), displs.data());
       
       if (myrank == 0) {
-        // Rank 0 starts with its own results
-        allResults = myResults;
-        
-        // In a full MPI implementation, rank 0 would receive results from other ranks
-        // For now, we'll just use the results from rank 0
-        // TODO: Implement proper MPI_Gather or similar for FileInfo structures
-        oops::Log::info() << "Note: Full MPI result gathering not implemented - only showing results from rank 0" << std::endl;
+        // Rank 0 deserializes all results
+        allResults.clear();
+        for (int rank = 0; rank < nprocs; ++rank) {
+          if (recvCounts[rank] > 0) {
+            std::vector<char> rankBuffer(allBuffers.begin() + displs[rank],
+                                        allBuffers.begin() + displs[rank] + recvCounts[rank]);
+            std::vector<FileInfo> rankResults = deserializeFileInfos(rankBuffer);
+            allResults.insert(allResults.end(), rankResults.begin(), rankResults.end());
+          }
+        }
       }
       
       return allResults;
+    }
+    
+    std::vector<char> serializeFileInfos(const std::vector<FileInfo>& infos) const {
+      std::vector<char> buffer;
+      
+      // Write number of FileInfo structures
+      size_t count = infos.size();
+      buffer.insert(buffer.end(), reinterpret_cast<const char*>(&count), 
+                   reinterpret_cast<const char*>(&count) + sizeof(size_t));
+      
+      for (const auto& info : infos) {
+        // Serialize filename
+        size_t filenameLen = info.filename.size();
+        buffer.insert(buffer.end(), reinterpret_cast<const char*>(&filenameLen),
+                     reinterpret_cast<const char*>(&filenameLen) + sizeof(size_t));
+        buffer.insert(buffer.end(), info.filename.begin(), info.filename.end());
+        
+        // Serialize numeric fields
+        buffer.insert(buffer.end(), reinterpret_cast<const char*>(&info.nobs),
+                     reinterpret_cast<const char*>(&info.nobs) + sizeof(size_t));
+        buffer.insert(buffer.end(), reinterpret_cast<const char*>(&info.nchans),
+                     reinterpret_cast<const char*>(&info.nchans) + sizeof(size_t));
+        buffer.insert(buffer.end(), reinterpret_cast<const char*>(&info.nrecs),
+                     reinterpret_cast<const char*>(&info.nrecs) + sizeof(size_t));
+        
+        // Serialize obsValueVars vector
+        size_t varsCount = info.obsValueVars.size();
+        buffer.insert(buffer.end(), reinterpret_cast<const char*>(&varsCount),
+                     reinterpret_cast<const char*>(&varsCount) + sizeof(size_t));
+        for (const auto& var : info.obsValueVars) {
+          size_t varLen = var.size();
+          buffer.insert(buffer.end(), reinterpret_cast<const char*>(&varLen),
+                       reinterpret_cast<const char*>(&varLen) + sizeof(size_t));
+          buffer.insert(buffer.end(), var.begin(), var.end());
+        }
+        
+        // Serialize success flag
+        buffer.insert(buffer.end(), reinterpret_cast<const char*>(&info.success),
+                     reinterpret_cast<const char*>(&info.success) + sizeof(bool));
+        
+        // Serialize errorMsg
+        size_t errorLen = info.errorMsg.size();
+        buffer.insert(buffer.end(), reinterpret_cast<const char*>(&errorLen),
+                     reinterpret_cast<const char*>(&errorLen) + sizeof(size_t));
+        buffer.insert(buffer.end(), info.errorMsg.begin(), info.errorMsg.end());
+      }
+      
+      return buffer;
+    }
+    
+    std::vector<FileInfo> deserializeFileInfos(const std::vector<char>& buffer) const {
+      std::vector<FileInfo> infos;
+      size_t pos = 0;
+      
+      // Read number of FileInfo structures
+      size_t count;
+      std::memcpy(&count, buffer.data() + pos, sizeof(size_t));
+      pos += sizeof(size_t);
+      
+      for (size_t i = 0; i < count; ++i) {
+        FileInfo info;
+        
+        // Deserialize filename
+        size_t filenameLen;
+        std::memcpy(&filenameLen, buffer.data() + pos, sizeof(size_t));
+        pos += sizeof(size_t);
+        info.filename = std::string(buffer.begin() + pos, buffer.begin() + pos + filenameLen);
+        pos += filenameLen;
+        
+        // Deserialize numeric fields
+        std::memcpy(&info.nobs, buffer.data() + pos, sizeof(size_t));
+        pos += sizeof(size_t);
+        std::memcpy(&info.nchans, buffer.data() + pos, sizeof(size_t));
+        pos += sizeof(size_t);
+        std::memcpy(&info.nrecs, buffer.data() + pos, sizeof(size_t));
+        pos += sizeof(size_t);
+        
+        // Deserialize obsValueVars vector
+        size_t varsCount;
+        std::memcpy(&varsCount, buffer.data() + pos, sizeof(size_t));
+        pos += sizeof(size_t);
+        for (size_t j = 0; j < varsCount; ++j) {
+          size_t varLen;
+          std::memcpy(&varLen, buffer.data() + pos, sizeof(size_t));
+          pos += sizeof(size_t);
+          std::string var(buffer.begin() + pos, buffer.begin() + pos + varLen);
+          info.obsValueVars.push_back(var);
+          pos += varLen;
+        }
+        
+        // Deserialize success flag
+        std::memcpy(&info.success, buffer.data() + pos, sizeof(bool));
+        pos += sizeof(bool);
+        
+        // Deserialize errorMsg
+        size_t errorLen;
+        std::memcpy(&errorLen, buffer.data() + pos, sizeof(size_t));
+        pos += sizeof(size_t);
+        info.errorMsg = std::string(buffer.begin() + pos, buffer.begin() + pos + errorLen);
+        pos += errorLen;
+        
+        infos.push_back(info);
+      }
+      
+      return infos;
     }
 
     void writeOutputFile(const std::string& filename, const std::vector<FileInfo>& fileInfos) const {
