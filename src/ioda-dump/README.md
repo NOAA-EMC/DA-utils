@@ -39,7 +39,7 @@ MPI is supported; for example with 4 processes:
 mpirun -np 4 ./ioda-dump.x path/to/config.yaml
 ```
 
-Note: See the MPI limitation below regarding result gathering.
+Files are distributed across ranks in a round-robin fashion, and all results are automatically gathered to rank 0 for output to the summary file.
 
 ## Configuration file (YAML)
 
@@ -119,8 +119,7 @@ If a file fails to open or parse, the section shows `Status: FAILED` and the err
 
 ## Notes and limitations
 
-- MPI distribution: input files are divided round-robin across ranks.
-- Result gathering: currently only rank 0 writes the summary and only includes its own results. Results from non-zero ranks are not gathered into the final report yet. For complete reports, run with a single MPI rank, or adapt the code to gather results across ranks.
+- MPI distribution: input files are divided round-robin across ranks, and results are automatically gathered to rank 0 for output.
 - Directory scanning is non-recursive and includes only regular files with extensions `.nc`, `.nc4`, `.h5`, `.hdf5`.
 - Time window filtering is applied by `ioda::ObsSpace` if time metadata are present in the file.
 - Ensure the parent directory of `output file` exists; otherwise opening the output will fail.
