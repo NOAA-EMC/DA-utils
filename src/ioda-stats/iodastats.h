@@ -47,6 +47,42 @@ namespace dautils {
         }
       static const std::string classname() {return "dautils::IodaStats";}
       // -----------------------------------------------------------------------------
+      // Convert longitudes from 0-360 to -180 to 180 range if needed
+      void convertLongitudes(std::vector<float>& longitudes) const {
+        if (longitudes.empty()) return;
+        
+        // Find min and max longitude values
+        float minLon = longitudes[0];
+        float maxLon = longitudes[0];
+        for (const auto& lon : longitudes) {
+          if (lon < minLon) minLon = lon;
+          if (lon > maxLon) maxLon = lon;
+        }
+        
+        // Check if longitudes are in 0-360 range
+        // If min is >= 0 and max is > 180, we assume 0-360 range
+        if (minLon >= 0.0 && maxLon > 180.0) {
+          oops::Log::info() << "Converting longitudes from 0-360 to -180 to 180 range" << std::endl;
+          oops::Log::info() << "Original range: [" << minLon << ", " << maxLon << "]" << std::endl;
+          
+          // Convert: if lon > 180, subtract 360
+          for (auto& lon : longitudes) {
+            if (lon > 180.0) {
+              lon -= 360.0;
+            }
+          }
+          
+          // Find new min and max for logging
+          minLon = longitudes[0];
+          maxLon = longitudes[0];
+          for (const auto& lon : longitudes) {
+            if (lon < minLon) minLon = lon;
+            if (lon > maxLon) maxLon = lon;
+          }
+          oops::Log::info() << "Converted range: [" << minLon << ", " << maxLon << "]" << std::endl;
+        }
+      }
+      // -----------------------------------------------------------------------------
       int execute(const eckit::Configuration & fullConfig) const {
         // define the time window
         const eckit::LocalConfiguration timeWindowConf(fullConfig, "time window");
@@ -273,12 +309,32 @@ namespace dautils {
           // now, compute stats over binned regions, if applicable
           // --------------------------------------------------------------------------
           if (obsSpace.has("regular grid binning")) {
+            // Read longitude data to determine if conversion is needed
+            std::vector<float> lon_sample(nlocs);
+            ospace.get_db("MetaData", "longitude", lon_sample);
+            
+            // Check if longitudes need conversion from 0-360 to -180 to 180
+            float minLon = lon_sample[0];
+            float maxLon = lon_sample[0];
+            for (const auto& lon : lon_sample) {
+              if (lon < minLon) minLon = lon;
+              if (lon > maxLon) maxLon = lon;
+            }
+            bool needsConversion = (minLon >= 0.0 && maxLon > 180.0);
+            
             // figure out if we are 0-360 or -180-180 longitudes
             eckit::LocalConfiguration binConfig;
             obsSpace.get("regular grid binning", binConfig);
-            bool negLon = false;
+            bool negLon = needsConversion;  // Use detected range instead of config
             if (binConfig.has("use negative longitudes")) {
               binConfig.get("use negative longitudes", negLon);
+              // Override config if data needs conversion
+              if (needsConversion) {
+                negLon = true;
+                oops::Log::info() << "Data has longitudes in 0-360 range, will convert to -180 to 180" << std::endl;
+              }
+            } else if (needsConversion) {
+              oops::Log::info() << "Data has longitudes in 0-360 range, will convert to -180 to 180" << std::endl;
             }
             // get lat/lon ranges based on bin sizes
             std::vector<float> longitudes(nbins_x+1);
@@ -319,6 +375,8 @@ namespace dautils {
                 }
                 ospace.get_db("MetaData", "latitude", ymaskvalues);
                 ospace.get_db("MetaData", "longitude", xmaskvalues);
+                // Convert longitudes from 0-360 to -180 to 180 if needed
+                convertLongitudes(xmaskvalues);
                 for (int iy=0; iy < nbins_y; iy++) {
                   for (int ix=0; ix < nbins_x; ix++) {
                     ibin = ix + (iy * nbins_x) + (idom * nbins_x * nbins_y);
@@ -336,6 +394,8 @@ namespace dautils {
               std::vector<float> xmaskvalues(nlocs), ymaskvalues(nlocs);
               ospace.get_db("MetaData", "latitude", ymaskvalues);
               ospace.get_db("MetaData", "longitude", xmaskvalues);
+              // Convert longitudes from 0-360 to -180 to 180 if needed
+              convertLongitudes(xmaskvalues);
               for (int iy=0; iy < nbins_y; iy++) {
                 for (int ix=0; ix < nbins_x; ix++) {
                   ibin = ix + (iy * nbins_x);
