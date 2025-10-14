@@ -898,16 +898,22 @@ class Conv(BaseGSI):
                 print(self.obstype + " is not currently supported. Exiting.")
                 return
         # loop through obsvariables and platforms to do processing
+        if "ges" in self.filename:
+            diagtype = "_ges_"
+        elif "anl" in self.filename:
+            diagtype = "_anl_"
+        else:
+            diagtype = "_obs_"
         for v in self.obsvars:
             for p in platforms:
                 # set up a NcWriter class
-                outname = OutDir + '/' + p + '_' + v + '_obs_' + \
+                outname = OutDir + '/' + p + '_' + v + diagtype + \
                     self.validtime.strftime("%Y%m%d%H") + '.nc4'
                 if (v == 'sst'):
-                    outname = OutDir + '/' + v + '_obs_' + \
+                    outname = OutDir + '/' + v + diagtype + \
                         self.validtime.strftime("%Y%m%d%H") + '.nc4'
                 if (p == 'windprof' or p == 'satwind' or p == 'scatwind' or p == 'vadwind' or p == 'pibal'):
-                    outname = OutDir + '/' + p + '_obs_' + \
+                    outname = OutDir + '/' + p + diagtype + \
                         self.validtime.strftime("%Y%m%d%H") + '.nc4'
                 if not clobber:
                     if (os.path.exists(outname)):
@@ -1403,8 +1409,14 @@ class Radiances(BaseGSI):
 
         print("Input Parameters: ObsBias=%s TotalBias=%s QCVars=%s TestRefs=%s" % (ObsBias, TotalBias, QCVars, TestRefs))
         # set up a NcWriter class
+        if "ges" in self.filename:
+            diagtype = "_ges_"
+        elif "anl" in self.filename:
+            diagtype = "_anl_"
+        else:
+            diagtype = "_obs_"
         outname = OutDir + '/' + self.sensor + '_' + self.satellite + \
-            '_obs_' + self.validtime.strftime("%Y%m%d%H") + '.nc4'
+            diagtype + self.validtime.strftime("%Y%m%d%H") + '.nc4'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
@@ -1847,7 +1859,13 @@ class Ozone(BaseGSI):
         to the JEDI/IODA observation format
         """
         # set up a NcWriter class
-        outname = OutDir+'/'+self.sensor+'_'+self.satellite+'_obs_'+self.validtime.strftime("%Y%m%d%H")+'.nc4'
+        if "ges" in self.filename:
+            diagtype = "_ges_"
+        elif "anl" in self.filename:
+            diagtype = "_anl_"
+        else:
+            diagtype = "_obs_"
+        outname = OutDir+'/'+self.sensor+'_'+self.satellite+diagtype+self.validtime.strftime("%Y%m%d%H")+'.nc4'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
