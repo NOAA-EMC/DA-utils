@@ -16,7 +16,9 @@ namespace dautils {
                       std::vector<std::string> groups, std::vector<std::string> stats,
                       std::vector<std::string> domainNames,
                       int nbins_x, int nbins_y,
-                      std::vector<std::string> bins_z) {
+                      std::vector<std::string> bins_z,
+                      std::vector<float> bin_lons = std::vector<float>(),
+                      std::vector<float> bin_lats = std::vector<float>()) {
       netCDF::NcFile ncFile(filename, netCDF::NcFile::replace);
       oops::Log::info() << "Opening " << filename << " for writing..." << std::endl;
       // create an unlimited time dimension
@@ -109,6 +111,31 @@ namespace dautils {
       // loop over group, then variables, then stats to create griddedBins/group/var/stat in file
       if (nbins_x > 0 || nbins_y > 0) {
         netCDF::NcGroup bingroup = ncFile.addGroup("griddedBins");
+        
+        // Write latitude and longitude coordinate arrays if provided
+        if (!bin_lats.empty() && !bin_lons.empty()) {
+          // Create 2D dimensions for lat/lon arrays
+          std::vector<netCDF::NcDim> coordDims;
+          coordDims.push_back(yDim);
+          coordDims.push_back(xDim);
+          
+          // Create and write latitude variable
+          netCDF::NcVar latVar = bingroup.addVar("latitude", netCDF::ncFloat, coordDims);
+          latVar.putAtt("units", "degrees_north");
+          latVar.putAtt("long_name", "latitude of bin centers");
+          
+          // Create and write longitude variable
+          netCDF::NcVar lonVar = bingroup.addVar("longitude", netCDF::ncFloat, coordDims);
+          lonVar.putAtt("units", "degrees_east");
+          lonVar.putAtt("long_name", "longitude of bin centers");
+          
+          // Write the data
+          std::vector<size_t> start = {0, 0};
+          std::vector<size_t> count = {static_cast<size_t>(nbins_y), static_cast<size_t>(nbins_x)};
+          latVar.putVar(start, count, bin_lats.data());
+          lonVar.putVar(start, count, bin_lons.data());
+        }
+        
         for (int g = 0; g < groups.size(); g++) {
           // create group group
           netCDF::NcGroup group = bingroup.addGroup(groups[g]);
