@@ -90,10 +90,20 @@ void dautils::CalcIodaStats::run() {
         std::vector<std::string> groups;
         std::vector<std::string> stats;
         std::vector<std::string> qcgroups;
+        std::vector<std::string> errorGroups;
         std::vector<eckit::LocalConfiguration> domains;
 
         obsSpace.get("groups to process", groups);
         obsSpace.get("qc groups", qcgroups);
+        if (obsSpace.has("error groups")) {
+            obsSpace.get("error groups", errorGroups);
+            if (errorGroups.size() != groups.size()) {
+                throw eckit::Exception("If error groups are provided, there must be one for each group.");
+            }
+        } else {
+            // if no error groups provided, create empty strings for each group
+            errorGroups.resize(groups.size(), "");
+        }
         obsSpace.get("statistics to compute", stats);
         std::vector<std::string> qccategories = obsSpace.getStringVector("qc categories", {"all"});
 
@@ -227,6 +237,6 @@ void dautils::CalcIodaStats::run() {
         stattxtfile.initializeTxtFile(outasciifile, timeWindow, obsSpaceName, obsSpace.has("channels"), asciiZBins);
         
         // first let us loop over the ascii vertical bins if they are defined, and a total if not
-        
+
     } // end of obs space loop
 } // end of run
