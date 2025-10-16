@@ -177,6 +177,8 @@ namespace dautils {
           // determine if we are doing regular binning for this obs space
           int nbins_x = 0;
           int nbins_y = 0;
+          std::vector<float> bin_lons_centers;
+          std::vector<float> bin_lats_centers;
           std::vector<std::string> zBinNames;
           std::vector<std::string> zBinMaskVar;
           std::vector<std::vector<float>> zBinMaskVals;          
@@ -187,6 +189,29 @@ namespace dautils {
             binConfig.get("bin size in degrees", binsize);
             nbins_x = int(360.0 / binsize);
             nbins_y = int(180.0 / binsize);
+            
+            // Compute bin centers for lat/lon
+            // Use -180 to 180 longitude range (standard convention)
+            float dx = 360.0 / float(nbins_x);
+            float dy = 180.0 / float(nbins_y);
+            
+            // Allocate space for 2D arrays (flattened in row-major order)
+            bin_lons_centers.resize(nbins_y * nbins_x);
+            bin_lats_centers.resize(nbins_y * nbins_x);
+            
+            // Compute centers
+            for (int iy = 0; iy < nbins_y; iy++) {
+              float lat_min = -90.0 + iy * dy;
+              float lat_center = lat_min + dy / 2.0;
+              for (int ix = 0; ix < nbins_x; ix++) {
+                float lon_min = -180.0 + ix * dx;
+                float lon_center = lon_min + dx / 2.0;
+                int idx = iy * nbins_x + ix;
+                bin_lats_centers[idx] = lat_center;
+                bin_lons_centers[idx] = lon_center;
+              }
+            }
+            
             std::vector<eckit::LocalConfiguration> zBins;
             if (binConfig.has("vertical bins")) {
               binConfig.get("vertical bins", zBins);
@@ -220,7 +245,8 @@ namespace dautils {
           obsSpace.get("output file", outfile);
           StatFile statfile;
           statfile.initializeNcfile(outfile, timeWindow, variables, channels, groups,
-                                    stats, domainNames, nbins_x, nbins_y, zBinNames);
+                                    stats, domainNames, nbins_x, nbins_y, zBinNames,
+                                    bin_lons_centers, bin_lats_centers);
 
           // --------------------------------------------------------------------------
           // first, compute stats over specified domains (or global only)
