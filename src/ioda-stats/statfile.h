@@ -113,7 +113,8 @@ namespace dautils {
         netCDF::NcGroup bingroup = ncFile.addGroup("griddedBins");
         
         // Write latitude and longitude coordinate arrays if provided
-        // Both nbins_x and nbins_y must be > 0 for 2D gridded bins
+        // Note: Both nbins_x and nbins_y must be > 0 for 2D gridded bins, which is always
+        // the case when bin centers are provided (they're computed together in iodastats.h)
         if (!bin_lats.empty() && !bin_lons.empty() && nbins_x > 0 && nbins_y > 0) {
           // Create 2D dimensions for lat/lon arrays
           std::vector<netCDF::NcDim> coordDims;
