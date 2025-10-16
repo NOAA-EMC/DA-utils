@@ -101,16 +101,18 @@ namespace dautils {
           // get the configuration for this obs space
           auto obsSpace = obsSpaces[i];
           eckit::LocalConfiguration obsConfig(obsSpace, "obs space");
+          std::string obsSpaceName;
+          obsConfig.get("name", obsSpaceName);
 
           // open the IODA file
           std::string obsFile;
           obsConfig.get("obsdatain.engine.obsfile", obsFile);
-          oops::Log::info() << "IODA-Stats: Processing " << obsFile << std::endl;
+          oops::Log::info() << "IODA-Stats: Processing " << obsSpaceName << ":" << obsFile << std::endl;
           ioda::ObsSpace ospace(obsConfig, mycomm, timeWindow, mycomm);
           const size_t nlocs = ospace.nlocs();
-          oops::Log::info() << obsFile << ": nlocs =" << nlocs << std::endl;
+          oops::Log::info() << obsSpaceName << ": nlocs =" << nlocs << std::endl;
           if (nlocs == 0) {
-            oops::Log::info() << "ObsSpace is empty, skipping " << obsFile << std::endl;
+            oops::Log::info() << "ObsSpace is empty, skipping " << obsSpaceName << ":" << obsFile << std::endl;
             continue;
           }
 
