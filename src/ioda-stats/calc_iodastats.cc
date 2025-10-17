@@ -31,6 +31,7 @@
 #include "calc_iodastats.h"
 #include "stat_ncfile.h"
 #include "stat_txtfile.h"
+#include "calcstats.h"
 
 void dautils::CalcIodaStats::run() {
     // Main driver code for calculating observation space
@@ -237,6 +238,393 @@ void dautils::CalcIodaStats::run() {
         stattxtfile.initializeTxtFile(outasciifile, timeWindow, obsSpaceName, obsSpace.has("channels"), asciiZBins);
         
         // first let us loop over the ascii vertical bins if they are defined, and a total if not
+        std::vector<std::vector<int>> ascii_binmask(asciiZBins.size() + 1, std::vector<int>(nlocs, 0));
+        std::vector<float> maskvalues(nlocs);
+        ospace.get_db("MetaData", asciiZBinVar, maskvalues);
+        // total column regardless of vertical binning
+        ascii_binmask[0] = update_mask(maskvalues, -1.0e30f, 1.0e30f, ascii_binmask[0]);
+        // make the first bin max value very large to include all values above min
+        asciiZBinRanges.insert(asciiZBinRanges.begin(), 1.0e30f);
+        for (int izbin = 0; izbin < asciiZBins.size(); izbin++) {
+            ascii_binmask[izbin+1] = update_mask(maskvalues, asciiZBinRanges[izbin+1], asciiZBinRanges[izbin], ascii_binmask[izbin+1]);
+        }
 
-    } // end of obs space loop
+        // loop over variables
+        for (int var = 0; var < variables.size(); var++) {
+            // loop over groups
+            for (int g = 0; g < groups.size(); g++) {
+                std::vector<float> buffer(nlocs);
+                std::vector<int> qcflag(nlocs);
+                std::vector<float> errorvals(nlocs);
+                // we have to process differently if there are channels
+                if (channels.empty()) {
+                    // read the full variable
+                    ospace.get_db(groups[g], variables[var], buffer);
+                    // get the QC group
+                    ospace.get_db(qcgroups[g], variables[var], qcflag);
+                    // get the error group if provided
+                    if (!errorGroups[g].empty()) {
+                        ospace.get_db(errorGroups[g], variables[var], errorvals);
+                    }
+                } else {
+                    // give the list of channels to read
+                    ospace.get_db(groups[g], variables[var], buffer, channels);
+                    // get the QC group
+                    ospace.get_db(qcgroups[g], variables[var], qcflag, channels);
+                    // get the error group if provided
+                    if (!errorGroups[g].empty()) {
+                        ospace.get_db(errorGroups[g], variables[var], errorvals, channels);
+                    }
+                }
+                // loop over stats
+                for (int s = 0; s < stats.size(); s++) {
+                    std::vector<std::vector<int>> intstat;
+                    std::vector<std::vector<float>> floatstat;
+                    // loop over vertical bins
+                    for (int izbin = 0; izbin < asciiZBins.size()+1; izbin++) {
+                        std::cout << "Bin " << izbin << " of " << asciiZBins.size()+1 << std::endl;
+                        if (stats[s] == "count") {
+                            intstat.push_back(getObsCount(buffer, qcflag, channels, ascii_binmask[izbin]));
+                        } else if (stats[s] == "mean") {
+                            floatstat.push_back(getMean(buffer, qcflag, channels, ascii_binmask[izbin]));
+                        }
+                        else if (stats[s] == "RMS") {
+                            floatstat.push_back(getRMS(buffer, qcflag, channels, ascii_binmask[izbin]));
+                        } else {
+                            oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
+                        }
+                    }
+                    // write to ASCII file
+                    // hard code some stuff for now
+                    int ch;
+                    if (channels.empty()) {
+                        ch = -1;
+                        if (stats[s] == "count") {
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g], "all",
+                                                  stats[s], intstat);
+                        } else {
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g], "all",
+                                                  stats[s], floatstat);
+                        }
+                    }
+                } // end of stats loop
+            } // end of group loop
+        } // end of variable loop
+        // close the ascii file
+        stattxtfile.closeFile();
+        // Now let's process the netCDF files by domains and/or bins
+        // --------------------------------------------------------------------------
+        // first, compute stats over specified domains (or global only)
+        // --------------------------------------------------------------------------
+        // loop over domains, compute the masks for each
+        std::vector<std::vector<int>> mask(domains.size()+1, std::vector<int>(nlocs, 0));
+        for (int idom = 0; idom < domains.size(); idom++ ) {
+            // compute mask with function 3 times, one for each possible mask
+            std::vector<float> maskvalues(nlocs);
+            if (!domainMaskVar1[idom].empty()) {
+                ospace.get_db("MetaData", domainMaskVar1[idom], maskvalues);
+                // Convert longitudes if this is a longitude mask
+                if (domainMaskVar1[idom] == "longitude") {
+                    convertLongitudes(maskvalues);
+                }
+                mask[idom] = update_mask(maskvalues, domainMaskVals1[idom][0], domainMaskVals1[idom][1], mask[idom]);
+            }
+            if (!domainMaskVar2[idom].empty()) {
+                ospace.get_db("MetaData", domainMaskVar2[idom], maskvalues);
+                // Convert longitudes if this is a longitude mask
+                if (domainMaskVar2[idom] == "longitude") {
+                    convertLongitudes(maskvalues);
+                }
+                mask[idom] = update_mask(maskvalues, domainMaskVals2[idom][0], domainMaskVals2[idom][1], mask[idom]);
+            }
+            if (!domainMaskVar3[idom].empty()) {
+                ospace.get_db("MetaData", domainMaskVar3[idom], maskvalues);
+                // Convert longitudes if this is a longitude mask
+                if (domainMaskVar3[idom] == "longitude") {
+                    convertLongitudes(maskvalues);
+                }
+                mask[idom] = update_mask(maskvalues, domainMaskVals3[idom][0], domainMaskVals3[idom][1], mask[idom]);
+            }
+        }
+
+        // loop over variables
+        for (int var = 0; var < variables.size(); var++) {
+            // loop over groups
+            for (int g = 0; g < groups.size(); g++) {
+                std::vector<float> buffer(nlocs);
+                std::vector<int> qcflag(nlocs);
+                // we have to process differently if there are channels
+                if (channels.empty()) {
+                    // read the full variable
+                    ospace.get_db(groups[g], variables[var], buffer);
+                    // get the QC group
+                    ospace.get_db(qcgroups[g], variables[var], qcflag);
+                } else {
+                    // give the list of channels to read
+                    ospace.get_db(groups[g], variables[var], buffer, channels);
+                    // get the QC group
+                    ospace.get_db(qcgroups[g], variables[var], qcflag, channels);
+                }
+                // loop over domains
+                for (int idom = 0; idom < domains.size()+1; idom++ ) {
+                    // loop over stats
+                    for (int s = 0; s < stats.size(); s++) {
+                        // Maybe eventually set this up as a factory but for now just do it
+                        // with this old school if/else if way
+                        std::vector<int> intstat;
+                        std::vector<float> floatstat;
+                        if (stats[s] == "count") {
+                            intstat = getObsCount(buffer, qcflag, channels, mask[idom]);
+                        } else if (stats[s] == "mean") {
+                            floatstat = getMean(buffer, qcflag, channels, mask[idom]);
+                        } else if (stats[s] == "RMS") {
+                            floatstat = getRMS(buffer, qcflag, channels, mask[idom]);
+                        } else {
+                            oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
+                        }
+                        if (stats[s] == "count") {
+                            statncfile.writeByDomains(outncfile, groups[g], variables[var],
+                                                    stats[s], idom, intstat);
+                        } else {
+                            statncfile.writeByDomains(outncfile, groups[g], variables[var],
+                                                    stats[s], idom, floatstat);
+                        }
+                    } // end of stats loop
+                } // end of domain loop
+            } // end of group loop
+        } // end of variable loop
+        // --------------------------------------------------------------------------
+        // now, compute stats over binned regions, if applicable
+        // --------------------------------------------------------------------------
+        if (obsSpace.has("regular grid binning")) {
+            // Read longitude data to determine if conversion is needed
+            std::vector<float> lon_sample(nlocs);
+            ospace.get_db("MetaData", "longitude", lon_sample);
+            
+            // Check if longitudes need conversion from 0-360 to -180 to 180
+            float minLon = lon_sample[0];
+            float maxLon = lon_sample[0];
+            for (const auto& lon : lon_sample) {
+                if (lon < minLon) minLon = lon;
+                if (lon > maxLon) maxLon = lon;
+            }
+            bool needsConversion = (minLon >= 0.0 && maxLon > 180.0);
+            
+            // figure out if we are 0-360 or -180-180 longitudes
+            eckit::LocalConfiguration binConfig;
+            obsSpace.get("regular grid binning", binConfig);
+            bool negLon = needsConversion;  // Use detected range instead of config
+            if (binConfig.has("use negative longitudes")) {
+                binConfig.get("use negative longitudes", negLon);
+                // Override config if data needs conversion
+                if (needsConversion) {
+                    negLon = true;
+                    oops::Log::info() << "Data has longitudes in 0-360 range, will convert to -180 to 180" << std::endl;
+                }
+            } else if (needsConversion) {
+                oops::Log::info() << "Data has longitudes in 0-360 range, will convert to -180 to 180" << std::endl;
+            }
+            // get lat/lon ranges based on bin sizes
+            std::vector<float> longitudes(nbins_x+1);
+            std::vector<float> latitudes(nbins_y+1);
+            float dx = 360.0 / float(nbins_x);
+            if (negLon) {
+                longitudes[0] = -180.0;
+            } else {
+                longitudes[0] = 0.0;
+            }
+            latitudes[0] = -90.0;
+            for (int ibin = 1; ibin < nbins_x+1; ibin++ ) {
+                longitudes[ibin] = longitudes[ibin-1] + dx;
+            }
+            for (int ibin = 1; ibin < nbins_y+1; ibin++ ) {
+                latitudes[ibin] = latitudes[ibin-1] + dx;
+            }
+
+            // loop over domains, compute the masks for each
+            int nzbins;
+            if (channels.empty()) {
+                nzbins = zBinNames.size();
+            } else {
+                nzbins = 1;
+            }
+            std::vector<std::vector<int>> binmask(nzbins * nbins_x * nbins_y, std::vector<int>(nlocs, 0));
+            if (channels.empty()) { // use vertical bins
+                int ibin = 0;
+                for (int idom = 0; idom < nzbins; idom++ ) {
+                    oops::Log::info() << "Now processing binned data for vertical bin: " << zBinNames[idom] << std::endl;
+                    oops::Log::info() << "nbins_x: " << nbins_x << " nbins_y: " << nbins_y << std::endl;
+                    // compute masks for the bins
+                    std::vector<float> xmaskvalues(nlocs), ymaskvalues(nlocs), zmaskvalues(nlocs);
+                    if (!zBinMaskVar[idom].empty()) {
+                        ospace.get_db("MetaData", zBinMaskVar[idom], zmaskvalues);
+                    }
+                    ospace.get_db("MetaData", "latitude", ymaskvalues);
+                    ospace.get_db("MetaData", "longitude", xmaskvalues);
+                    // Convert longitudes from 0-360 to -180 to 180 if needed
+                    convertLongitudes(xmaskvalues);
+                    for (int iy=0; iy < nbins_y; iy++) {
+                        for (int ix=0; ix < nbins_x; ix++) {
+                            ibin = ix + (iy * nbins_x) + (idom * nbins_x * nbins_y);
+                            binmask[ibin] = update_mask(zmaskvalues, zBinMaskVals[idom][0], zBinMaskVals[idom][1], binmask[ibin]);
+                            binmask[ibin] = update_mask(ymaskvalues, latitudes[iy], latitudes[iy+1], binmask[ibin]);
+                            binmask[ibin] = update_mask(xmaskvalues, longitudes[ix], longitudes[ix+1], binmask[ibin]);
+                        }
+                    }
+                }
+            } else { // assumes channels
+                int ibin = 0;
+                oops::Log::info() << "nbins_x: " << nbins_x << " nbins_y: " << nbins_y << std::endl;
+                // compute masks for the bins
+                std::vector<float> xmaskvalues(nlocs), ymaskvalues(nlocs);
+                ospace.get_db("MetaData", "latitude", ymaskvalues);
+                ospace.get_db("MetaData", "longitude", xmaskvalues);
+                // Convert longitudes from 0-360 to -180 to 180 if needed
+                convertLongitudes(xmaskvalues);
+                for (int iy=0; iy < nbins_y; iy++) {
+                    for (int ix=0; ix < nbins_x; ix++) {
+                        ibin = ix + (iy * nbins_x);
+                        binmask[ibin] = update_mask(ymaskvalues, latitudes[iy], latitudes[iy+1], binmask[ibin]);
+                        binmask[ibin] = update_mask(xmaskvalues, longitudes[ix], longitudes[ix+1], binmask[ibin]);
+                    }
+                }
+            }
+            // loop over variables
+            for (int var = 0; var < variables.size(); var++) {
+                // loop over groups
+                for (int g = 0; g < groups.size(); g++) {
+                    std::vector<float> buffer(nlocs);
+                    std::vector<int> qcflag(nlocs);
+                    // we have to process differently if there are channels
+                    if (channels.empty()) {
+                        // read the full variable
+                        ospace.get_db(groups[g], variables[var], buffer);
+                        // get the QC group
+                        ospace.get_db(qcgroups[g], variables[var], qcflag);
+                    } else {
+                        // give the list of channels to read
+                        ospace.get_db(groups[g], variables[var], buffer, channels);
+                        // get the QC group
+                        ospace.get_db(qcgroups[g], variables[var], qcflag, channels);
+                    }
+                    // loop over stats
+                    for (int s = 0; s < stats.size(); s++) {
+                        if (channels.empty()) {
+                            // loop over bins
+                            int ibin = 0;
+                            for (int idom = 0; idom < nzbins; idom++ ) {
+                                std::vector<std::vector<float>> fullfloatstat(nbins_y, std::vector<float>(nbins_x,0.0));
+                                std::vector<std::vector<int>> fullintstat(nbins_y, std::vector<int>(nbins_x,0.0));
+                                for (int iy=0; iy < nbins_y; iy++) {
+                                    for (int ix=0; ix < nbins_x; ix++) {
+                                        ibin = ix + (iy * nbins_x) + (idom * nbins_x * nbins_y);
+                                        // Maybe eventually set this up as a factory but for now just do it
+                                        // with this old school if/else if way
+                                        std::vector<int> intstat;
+                                        std::vector<float> floatstat;
+                                        if (stats[s] == "count") {
+                                            intstat = getObsCount(buffer, qcflag, channels, binmask[ibin]);
+                                        } else if (stats[s] == "mean") {
+                                            floatstat = getMean(buffer, qcflag, channels, binmask[ibin]);
+                                        } else if (stats[s] == "RMS") {
+                                            floatstat = getRMS(buffer, qcflag, channels, binmask[ibin]);
+                                        }
+                                        if (stats[s] == "count") {
+                                            fullintstat[iy][ix] = intstat[0];
+                                        } else {
+                                            fullfloatstat[iy][ix] = floatstat[0];
+                                        }
+                                   } // end of ix
+                                } // end of iy
+                                if (stats[s] == "count") {
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        stats[s], idom, nbins_y, nbins_x, fullintstat);
+                                } else {
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        stats[s], idom, nbins_y, nbins_x, fullfloatstat);
+                                }
+                            }
+                        } else { // variable has channels not vertical bins
+                            std::vector<std::vector<std::vector<float>>> fullfloatstat(channels.size(),
+                              std::vector<std::vector<float>>(nbins_y,std::vector<float>(nbins_x, 0.0)));
+                            std::vector<std::vector<std::vector<int>>> fullintstat(channels.size(),
+                              std::vector<std::vector<int>>(nbins_y,std::vector<int>(nbins_x, 0.0)));
+                            int ibin = 0;
+                            for (int iy=0; iy < nbins_y; iy++) {
+                                for (int ix=0; ix < nbins_x; ix++) {
+                                    ibin = ix + (iy * nbins_x);
+                                    // Maybe eventually set this up as a factory but for now just do it
+                                    // with this old school if/else if way
+                                    std::vector<int> intstat;
+                                    std::vector<float> floatstat;
+                                    if (stats[s] == "count") {
+                                        intstat = getObsCount(buffer, qcflag, channels, binmask[ibin]);
+                                    } else if (stats[s] == "mean") {
+                                        floatstat = getMean(buffer, qcflag, channels, binmask[ibin]);
+                                    } else if (stats[s] == "RMS") {
+                                        floatstat = getRMS(buffer, qcflag, channels, binmask[ibin]);
+                                    }
+                                    // loop over channels
+                                    for (int ich = 0; ich < channels.size(); ich++ ) {
+                                        if (stats[s] == "count") {
+                                            fullintstat[ich][iy][ix] = intstat[ich];
+                                        } else {
+                                            fullfloatstat[ich][iy][ix] = floatstat[ich];  
+                                        }
+                                    }
+                                }
+                            }
+                            // loop over channels
+                            for (int ich = 0; ich < channels.size(); ich++ ) {
+                                if (stats[s] == "count") {
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        stats[s], ich, nbins_y, nbins_x, fullintstat[ich]);                  
+                                } else {
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        stats[s], ich, nbins_y, nbins_x, fullfloatstat[ich]);
+                                }
+                            } // end of channels loop
+                        } // channels or bins
+                    } // end of stats loop
+                } // end of group loop
+            } // end of variable loop
+        } // end of regular binning check
+    }// end of obs space loop
 } // end of run
+
+// -----------------------------------------------------------------------------
+// Convert longitudes from 0-360 to -180 to 180 range if needed
+void dautils::convertLongitudes(std::vector<float>& longitudes) {
+    if (longitudes.empty()) return;
+
+    // Find min and max longitude values
+    float minLon = longitudes[0];
+    float maxLon = longitudes[0];
+    for (const auto& lon : longitudes) {
+        if (lon < minLon) minLon = lon;
+        if (lon > maxLon) maxLon = lon;
+    }
+
+    // Check if longitudes are in 0-360 range
+    // If min is >= 0 and max is > 180, we assume 0-360 range
+    if (minLon >= 0.0 && maxLon > 180.0) {
+        oops::Log::info() << "Converting longitudes from 0-360 to -180 to 180 range" << std::endl;
+        oops::Log::info() << "Original range: [" << minLon << ", " << maxLon << "]" << std::endl;
+        
+        // Convert: if lon > 180, subtract 360
+        for (auto& lon : longitudes) {
+            if (lon > 180.0) {
+                lon -= 360.0;
+            }
+        }
+        
+        // Find new min and max for logging
+        minLon = longitudes[0];
+        maxLon = longitudes[0];
+        for (const auto& lon : longitudes) {
+            if (lon < minLon) minLon = lon;
+            if (lon > maxLon) maxLon = lon;
+            }
+        oops::Log::info() << "Converted range: [" << minLon << ", " << maxLon << "]" << std::endl;
+    }
+}

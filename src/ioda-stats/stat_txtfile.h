@@ -18,7 +18,12 @@ namespace dautils {
 
       int initializeTxtFile(const std::string &filename, const util::TimeWindow &timeWindow,
                             const std::string &obsSpaceName, bool hasChannels = false, std::vector<std::string> zBins = {});
-      int writeData(const std::vector<float> &data);
+      int writeTxtStat(const std::string &obsSpaceName, const std::string &variable,
+                           const int &ch, const std::string &group, const std::string &assim,
+                           const std::string &statname, const std::vector<std::vector<float>> &values);
+      int writeTxtStat(const std::string &obsSpaceName, const std::string &variable,
+                           const int &ch, const std::string &group, const std::string &assim,
+                           const std::string &statname, const std::vector<std::vector<int>> &values);
       int closeFile();
 
     private:

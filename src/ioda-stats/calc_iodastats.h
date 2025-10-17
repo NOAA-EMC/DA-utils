@@ -14,5 +14,5 @@ namespace dautils {
       const eckit::Configuration & config_;
       const eckit::mpi::Comm & comm_;
   };
-
+  void convertLongitudes(std::vector<float>& longitudes);
 } // namespace dautils
