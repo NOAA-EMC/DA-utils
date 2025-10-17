@@ -402,23 +402,43 @@ void dautils::CalcIodaStats::run() {
                     for (int s = 0; s < stats.size(); s++) {
                         // Maybe eventually set this up as a factory but for now just do it
                         // with this old school if/else if way
-                        std::vector<int> intstat;
-                        std::vector<float> floatstat;
+                        std::vector<std::vector<int>> intstat;
+                        std::vector<std::vector<float>> floatstat;
                         if (stats[s] == "count") {
-                            intstat = getObsCount(buffer, qcflag, channels, mask[idom])[0];
+                            intstat = getObsCount(buffer, qcflag, channels, mask[idom]);
                         } else if (stats[s] == "mean") {
-                            floatstat = getMean(buffer, qcflag, channels, mask[idom])[0];
+                            floatstat = getMean(buffer, qcflag, channels, mask[idom]);
                         } else if (stats[s] == "RMS") {
-                            floatstat = getRMS(buffer, qcflag, channels, mask[idom])[0];
+                            floatstat = getRMS(buffer, qcflag, channels, mask[idom]);
                         } else {
                             oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
                         }
                         if (stats[s] == "count") {
+                            std::vector<int> intstat_assim, intstat_monit, intstat_rej;
+                            for (auto val : intstat) {
+                                intstat_assim.push_back(val[0]);
+                                intstat_monit.push_back(val[1]);
+                                intstat_rej.push_back(val[2]);
+                            }
                             statncfile.writeByDomains(outncfile, groups[g], variables[var],
-                                                    stats[s], idom, intstat);
+                                                    "assimilated_" + stats[s], idom, intstat_assim);
+                            statncfile.writeByDomains(outncfile, groups[g], variables[var],
+                                                    "monitored_" + stats[s], idom, intstat_monit);
+                            statncfile.writeByDomains(outncfile, groups[g], variables[var],
+                                                    "rejected_" + stats[s], idom, intstat_rej);
                         } else {
+                            std::vector<float> floatstat_assim, floatstat_monit, floatstat_rej;
+                            for (auto val : floatstat) {
+                                floatstat_assim.push_back(val[0]);
+                                floatstat_monit.push_back(val[1]);
+                                floatstat_rej.push_back(val[2]);
+                            }
                             statncfile.writeByDomains(outncfile, groups[g], variables[var],
-                                                    stats[s], idom, floatstat);
+                                                    "assimilated_" + stats[s], idom, floatstat_assim);
+                            statncfile.writeByDomains(outncfile, groups[g], variables[var],
+                                                    "monitored_" + stats[s], idom, floatstat_monit);
+                            statncfile.writeByDomains(outncfile, groups[g], variables[var],
+                                                    "rejected_" + stats[s], idom, floatstat_rej);
                         }
                     } // end of stats loop
                 } // end of domain loop
@@ -544,41 +564,79 @@ void dautils::CalcIodaStats::run() {
                             // loop over bins
                             int ibin = 0;
                             for (int idom = 0; idom < nzbins; idom++ ) {
-                                std::vector<std::vector<float>> fullfloatstat(nbins_y, std::vector<float>(nbins_x,0.0));
-                                std::vector<std::vector<int>> fullintstat(nbins_y, std::vector<int>(nbins_x,0.0));
+                                std::vector<std::vector<float>> fullfloatstat_assim(nbins_y, std::vector<float>(nbins_x,0.0));
+                                std::vector<std::vector<int>> fullintstat_assim(nbins_y, std::vector<int>(nbins_x,0.0));
+                                std::vector<std::vector<float>> fullfloatstat_monitored(nbins_y, std::vector<float>(nbins_x,0.0));
+                                std::vector<std::vector<int>> fullintstat_monitored(nbins_y, std::vector<int>(nbins_x,0.0));
+                                std::vector<std::vector<float>> fullfloatstat_rejected(nbins_y, std::vector<float>(nbins_x,0.0));
+                                std::vector<std::vector<int>> fullintstat_rejected(nbins_y, std::vector<int>(nbins_x,0.0));
                                 for (int iy=0; iy < nbins_y; iy++) {
                                     for (int ix=0; ix < nbins_x; ix++) {
                                         ibin = ix + (iy * nbins_x) + (idom * nbins_x * nbins_y);
                                         // Maybe eventually set this up as a factory but for now just do it
                                         // with this old school if/else if way
-                                        std::vector<int> intstat;
-                                        std::vector<float> floatstat;
+                                        std::vector<std::vector<int>> intstat;
+                                        std::vector<std::vector<float>> floatstat;
                                         if (stats[s] == "count") {
-                                            intstat = getObsCount(buffer, qcflag, channels, binmask[ibin])[0];
+                                            intstat = getObsCount(buffer, qcflag, channels, binmask[ibin]);
                                         } else if (stats[s] == "mean") {
-                                            floatstat = getMean(buffer, qcflag, channels, binmask[ibin])[0];
+                                            floatstat = getMean(buffer, qcflag, channels, binmask[ibin]);
                                         } else if (stats[s] == "RMS") {
-                                            floatstat = getRMS(buffer, qcflag, channels, binmask[ibin])[0];
+                                            floatstat = getRMS(buffer, qcflag, channels, binmask[ibin]);
                                         }
+                                                                    std::vector<int> intstat_assim, intstat_monit, intstat_rej;
+
                                         if (stats[s] == "count") {
-                                            fullintstat[iy][ix] = intstat[0];
+                                            std::vector<int> intstat_assim, intstat_monit, intstat_rej;
+                                            for (auto val : intstat) {
+                                                intstat_assim.push_back(val[0]);
+                                                intstat_monit.push_back(val[1]);
+                                                intstat_rej.push_back(val[2]);
+                                            }
+                                            fullintstat_assim[iy][ix] = intstat_assim[0];
+                                            fullintstat_monitored[iy][ix] = intstat_monit[0];
+                                            fullintstat_rejected[iy][ix] = intstat_rej[0];
                                         } else {
-                                            fullfloatstat[iy][ix] = floatstat[0];
+                                            std::vector<float> floatstat_assim, floatstat_monit, floatstat_rej;
+                                            for (auto val : floatstat) {
+                                                floatstat_assim.push_back(val[0]);
+                                                floatstat_monit.push_back(val[1]);
+                                                floatstat_rej.push_back(val[2]);
+                                            }
+                                            fullfloatstat_assim[iy][ix] = floatstat_assim[0];
+                                            fullfloatstat_monitored[iy][ix] = floatstat_monit[0];
+                                            fullfloatstat_rejected[iy][ix] = floatstat_rej[0];
                                         }
                                    } // end of ix
                                 } // end of iy
                                 if (stats[s] == "count") {
                                     statncfile.writeByBins(outncfile, groups[g], variables[var],
-                                                        stats[s], idom, nbins_y, nbins_x, fullintstat);
+                                                        "assimilated_" + stats[s], idom, nbins_y, nbins_x, fullintstat_assim);
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        "monitored_" + stats[s], idom, nbins_y, nbins_x, fullintstat_monitored);
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        "rejected_" + stats[s], idom, nbins_y, nbins_x, fullintstat_rejected);
                                 } else {
                                     statncfile.writeByBins(outncfile, groups[g], variables[var],
-                                                        stats[s], idom, nbins_y, nbins_x, fullfloatstat);
+                                                        "assimilated_" + stats[s], idom, nbins_y, nbins_x, fullfloatstat_assim);
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        "monitored_" + stats[s], idom, nbins_y, nbins_x, fullfloatstat_monitored);
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        "rejected_" + stats[s], idom, nbins_y, nbins_x, fullfloatstat_rejected);
                                 }
                             }
                         } else { // variable has channels not vertical bins
-                            std::vector<std::vector<std::vector<float>>> fullfloatstat(channels.size(),
+                            std::vector<std::vector<std::vector<float>>> fullfloatstat_assim(channels.size(),
                               std::vector<std::vector<float>>(nbins_y,std::vector<float>(nbins_x, 0.0)));
-                            std::vector<std::vector<std::vector<int>>> fullintstat(channels.size(),
+                            std::vector<std::vector<std::vector<int>>> fullintstat_assim(channels.size(),
+                              std::vector<std::vector<int>>(nbins_y,std::vector<int>(nbins_x, 0.0)));
+                            std::vector<std::vector<std::vector<float>>> fullfloatstat_monitored(channels.size(),
+                              std::vector<std::vector<float>>(nbins_y,std::vector<float>(nbins_x, 0.0)));
+                            std::vector<std::vector<std::vector<int>>> fullintstat_monitored(channels.size(),
+                              std::vector<std::vector<int>>(nbins_y,std::vector<int>(nbins_x, 0.0)));
+                            std::vector<std::vector<std::vector<float>>> fullfloatstat_rejected(channels.size(),
+                              std::vector<std::vector<float>>(nbins_y,std::vector<float>(nbins_x, 0.0)));
+                            std::vector<std::vector<std::vector<int>>> fullintstat_rejected(channels.size(),
                               std::vector<std::vector<int>>(nbins_y,std::vector<int>(nbins_x, 0.0)));
                             int ibin = 0;
                             for (int iy=0; iy < nbins_y; iy++) {
@@ -586,21 +644,21 @@ void dautils::CalcIodaStats::run() {
                                     ibin = ix + (iy * nbins_x);
                                     // Maybe eventually set this up as a factory but for now just do it
                                     // with this old school if/else if way
-                                    std::vector<int> intstat;
-                                    std::vector<float> floatstat;
+                                    std::vector<std::vector<int>> intstat;
+                                    std::vector<std::vector<float>> floatstat;
                                     if (stats[s] == "count") {
-                                        intstat = getObsCount(buffer, qcflag, channels, binmask[ibin])[0];
+                                        intstat = getObsCount(buffer, qcflag, channels, binmask[ibin]);
                                     } else if (stats[s] == "mean") {
-                                        floatstat = getMean(buffer, qcflag, channels, binmask[ibin])[0];
+                                        floatstat = getMean(buffer, qcflag, channels, binmask[ibin]);
                                     } else if (stats[s] == "RMS") {
-                                        floatstat = getRMS(buffer, qcflag, channels, binmask[ibin])[0];
+                                        floatstat = getRMS(buffer, qcflag, channels, binmask[ibin]);
                                     }
                                     // loop over channels
                                     for (int ich = 0; ich < channels.size(); ich++ ) {
                                         if (stats[s] == "count") {
-                                            fullintstat[ich][iy][ix] = intstat[ich];
+                                            fullintstat_assim[ich][iy][ix] = intstat[0][ich];
                                         } else {
-                                            fullfloatstat[ich][iy][ix] = floatstat[ich];  
+                                            fullfloatstat_assim[ich][iy][ix] = floatstat[0][ich];  
                                         }
                                     }
                                 }
@@ -609,10 +667,18 @@ void dautils::CalcIodaStats::run() {
                             for (int ich = 0; ich < channels.size(); ich++ ) {
                                 if (stats[s] == "count") {
                                     statncfile.writeByBins(outncfile, groups[g], variables[var],
-                                                        stats[s], ich, nbins_y, nbins_x, fullintstat[ich]);                  
+                                                        "assimilated_" + stats[s], ich, nbins_y, nbins_x, fullintstat_assim[ich]);
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        "monitored_" + stats[s], ich, nbins_y, nbins_x, fullintstat_monitored[ich]);
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        "rejected_" + stats[s], ich, nbins_y, nbins_x, fullintstat_rejected[ich]);
                                 } else {
                                     statncfile.writeByBins(outncfile, groups[g], variables[var],
-                                                        stats[s], ich, nbins_y, nbins_x, fullfloatstat[ich]);
+                                                        "assimilated_" + stats[s], ich, nbins_y, nbins_x, fullfloatstat_assim[ich]);
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        "monitored_" + stats[s], ich, nbins_y, nbins_x, fullfloatstat_monitored[ich]);
+                                    statncfile.writeByBins(outncfile, groups[g], variables[var],
+                                                        "rejected_" + stats[s], ich, nbins_y, nbins_x, fullfloatstat_rejected[ich]);
                                 }
                             } // end of channels loop
                         } // channels or bins

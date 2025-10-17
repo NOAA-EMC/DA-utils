@@ -88,12 +88,15 @@ int StatNcFile::initializeNcfile(const std::string filename, const util::TimeWin
       netCDF::NcGroup group2 = group.addGroup(variables[var]);
       // loop over statistics to write out
       for (int s = 0; s < stats.size(); s++) {
-        netCDF::NcVar varout;
-        if (stats[s] == "count") {
-          varout = group2.addVar(stats[s], netCDF::ncInt, domainDimVector);
-        } else {
-          varout = group2.addVar(stats[s], netCDF::ncFloat, domainDimVector);
-          varout.putAtt("_FillValue", netCDF::ncFloat, fillVal_);
+        // loop over use_categories
+        for (int c = 0; c < use_categories.size(); c++) {
+          netCDF::NcVar varout;
+          if (stats[s] == "count") {
+            varout = group2.addVar(use_categories[c] + "_" + stats[s], netCDF::ncInt, domainDimVector);
+          } else {
+            varout = group2.addVar(use_categories[c] + "_" + stats[s], netCDF::ncFloat, domainDimVector);
+            varout.putAtt("_FillValue", netCDF::ncFloat, fillVal_);
+          }
         }
       }
     }
@@ -136,12 +139,15 @@ int StatNcFile::initializeNcfile(const std::string filename, const util::TimeWin
         netCDF::NcGroup group2 = group.addGroup(variables[var]);
         // loop over statistics to write out
         for (int s = 0; s < stats.size(); s++) {
-          netCDF::NcVar varout;
-          if (stats[s] == "count") {
-            varout = group2.addVar(stats[s], netCDF::ncInt, binningDimVector);
-          } else {
-            varout = group2.addVar(stats[s], netCDF::ncFloat, binningDimVector);
-            varout.putAtt("_FillValue", netCDF::ncFloat, fillVal_);
+          // loop over use categories
+          for (int c = 0; c < use_categories.size(); c++) {
+            netCDF::NcVar varout;
+            if (stats[s] == "count") {
+              varout = group2.addVar(use_categories[c] + "_" + stats[s], netCDF::ncInt, binningDimVector);
+            } else {
+              varout = group2.addVar(use_categories[c] + "_" + stats[s], netCDF::ncFloat, binningDimVector);
+              varout.putAtt("_FillValue", netCDF::ncFloat, fillVal_);
+            }
           }
         }
       }

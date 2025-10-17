@@ -13,6 +13,7 @@ namespace dautils {
   class StatNcFile {
     public:
       float fillVal_ = util::missingValue<float>();
+      std::vector<std::string> use_categories = {"assimilated", "monitored", "rejected"};
       
       int initializeNcfile(const std::string filename, const util::TimeWindow timeWindow,
                           std::vector<std::string> variables, std::vector<int> channels,
