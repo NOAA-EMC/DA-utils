@@ -196,8 +196,10 @@ void dautils::CalcIodaStats::run() {
             }
         }
 
-        // assert that the QC groups list is the same size as groups
-        assert(groups.size() == qcgroups.size());
+        // Check that the QC groups list is the same size as groups
+        if (groups.size() != qcgroups.size()) {
+            throw eckit::Exception("QC groups list size does not match groups list size", Here());
+        }
 
         // if the zBins are empty, create a dummy one for 'all'
         if (zBinNames.size() == 0){
@@ -235,7 +237,7 @@ void dautils::CalcIodaStats::run() {
             obsSpace.get("output ascii file", outasciifile);
         }
         StatTxtFile stattxtfile;
-        stattxtfile.initializeTxtFile(outasciifile, timeWindow, obsSpaceName, obsSpace.has("channels"), asciiZBins);
+        stattxtfile.initializeTxtFile(outasciifile, timeWindow, obsSpaceName, nlocs, obsSpace.has("channels"), asciiZBins);
         
         // first let us loop over the ascii vertical bins if they are defined, and a total if not
         std::vector<std::vector<int>> ascii_binmask(asciiZBins.size() + 1, std::vector<int>(nlocs, 0));
@@ -278,11 +280,10 @@ void dautils::CalcIodaStats::run() {
                 }
                 // loop over stats
                 for (int s = 0; s < stats.size(); s++) {
-                    std::vector<std::vector<int>> intstat;
-                    std::vector<std::vector<float>> floatstat;
+                    std::vector<std::vector<std::vector<int>>> intstat;
+                    std::vector<std::vector<std::vector<float>>> floatstat;
                     // loop over vertical bins
                     for (int izbin = 0; izbin < asciiZBins.size()+1; izbin++) {
-                        std::cout << "Bin " << izbin << " of " << asciiZBins.size()+1 << std::endl;
                         if (stats[s] == "count") {
                             intstat.push_back(getObsCount(buffer, qcflag, channels, ascii_binmask[izbin]));
                         } else if (stats[s] == "mean") {
@@ -294,17 +295,47 @@ void dautils::CalcIodaStats::run() {
                             oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
                         }
                     }
+                    // reshape the vectors for writing to the ASCII file
+                    int nch = 1;
+                    if (!channels.empty()) nch = channels.size();
+                    std::vector<std::vector<std::vector<int>>> intstat_reshaped(3,
+                        std::vector<std::vector<int>>(asciiZBins.size()+1,
+                            std::vector<int>(nch, 0)));
+                    std::vector<std::vector<std::vector<float>>> floatstat_reshaped(3,
+                        std::vector<std::vector<float>>(asciiZBins.size()+1,
+                            std::vector<float>(nch, 0.0)));
+                    for (int ibin = 0; ibin < asciiZBins.size()+1; ibin++) {
+                        for (int ich = 0; ich < nch; ich++) {
+                            if (stats[s] == "count") {
+                                intstat_reshaped[0][ibin][ich] = intstat[ibin][ich][0];
+                                intstat_reshaped[1][ibin][ich] = intstat[ibin][ich][1];
+                                intstat_reshaped[2][ibin][ich] = intstat[ibin][ich][2];
+                            } else {
+                                floatstat_reshaped[0][ibin][ich] = floatstat[ibin][ich][0];
+                                floatstat_reshaped[1][ibin][ich] = floatstat[ibin][ich][1];
+                                floatstat_reshaped[2][ibin][ich] = floatstat[ibin][ich][2];
+                            }
+                        }
+                    }
                     // write to ASCII file
                     // hard code some stuff for now
                     int ch;
                     if (channels.empty()) {
                         ch = -1;
                         if (stats[s] == "count") {
-                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g], "all",
-                                                  stats[s], intstat);
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
+                                                  "assimilated", stats[s], intstat_reshaped[0]);
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
+                                                  "monitored", stats[s], intstat_reshaped[1]);
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
+                                                  "rejected", stats[s], intstat_reshaped[2]);
                         } else {
-                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g], "all",
-                                                  stats[s], floatstat);
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
+                                                  "assimilated", stats[s], floatstat_reshaped[0]);
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
+                                                  "monitored", stats[s], floatstat_reshaped[1]);
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
+                                                  "rejected", stats[s], floatstat_reshaped[2]);
                         }
                     }
                 } // end of stats loop
@@ -374,11 +405,11 @@ void dautils::CalcIodaStats::run() {
                         std::vector<int> intstat;
                         std::vector<float> floatstat;
                         if (stats[s] == "count") {
-                            intstat = getObsCount(buffer, qcflag, channels, mask[idom]);
+                            intstat = getObsCount(buffer, qcflag, channels, mask[idom])[0];
                         } else if (stats[s] == "mean") {
-                            floatstat = getMean(buffer, qcflag, channels, mask[idom]);
+                            floatstat = getMean(buffer, qcflag, channels, mask[idom])[0];
                         } else if (stats[s] == "RMS") {
-                            floatstat = getRMS(buffer, qcflag, channels, mask[idom]);
+                            floatstat = getRMS(buffer, qcflag, channels, mask[idom])[0];
                         } else {
                             oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
                         }
@@ -523,11 +554,11 @@ void dautils::CalcIodaStats::run() {
                                         std::vector<int> intstat;
                                         std::vector<float> floatstat;
                                         if (stats[s] == "count") {
-                                            intstat = getObsCount(buffer, qcflag, channels, binmask[ibin]);
+                                            intstat = getObsCount(buffer, qcflag, channels, binmask[ibin])[0];
                                         } else if (stats[s] == "mean") {
-                                            floatstat = getMean(buffer, qcflag, channels, binmask[ibin]);
+                                            floatstat = getMean(buffer, qcflag, channels, binmask[ibin])[0];
                                         } else if (stats[s] == "RMS") {
-                                            floatstat = getRMS(buffer, qcflag, channels, binmask[ibin]);
+                                            floatstat = getRMS(buffer, qcflag, channels, binmask[ibin])[0];
                                         }
                                         if (stats[s] == "count") {
                                             fullintstat[iy][ix] = intstat[0];
@@ -558,11 +589,11 @@ void dautils::CalcIodaStats::run() {
                                     std::vector<int> intstat;
                                     std::vector<float> floatstat;
                                     if (stats[s] == "count") {
-                                        intstat = getObsCount(buffer, qcflag, channels, binmask[ibin]);
+                                        intstat = getObsCount(buffer, qcflag, channels, binmask[ibin])[0];
                                     } else if (stats[s] == "mean") {
-                                        floatstat = getMean(buffer, qcflag, channels, binmask[ibin]);
+                                        floatstat = getMean(buffer, qcflag, channels, binmask[ibin])[0];
                                     } else if (stats[s] == "RMS") {
-                                        floatstat = getRMS(buffer, qcflag, channels, binmask[ibin]);
+                                        floatstat = getRMS(buffer, qcflag, channels, binmask[ibin])[0];
                                     }
                                     // loop over channels
                                     for (int ich = 0; ich < channels.size(); ich++ ) {

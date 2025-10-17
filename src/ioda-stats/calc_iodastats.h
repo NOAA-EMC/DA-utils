@@ -1,5 +1,8 @@
 #pragma once
 
+#include "eckit/config/LocalConfiguration.h"
+#include "eckit/mpi/Comm.h"
+
 namespace dautils {
   class CalcIodaStats {
     public :

@@ -3,33 +3,37 @@
 namespace dautils {
 
     int StatTxtFile::initializeTxtFile(const std::string &filename, const util::TimeWindow &timeWindow,
-                                    const std::string &obsSpaceName, bool hasChannels, std::vector<std::string> zBins) {
+                                    const std::string &obsSpaceName, const int &nlocs, bool hasChannels,
+                                    std::vector<std::string> zBins) {
         txtFile_.open(filename);
         if (!txtFile_.is_open()) {
             oops::Log::error() << "Error opening file: " << filename << std::endl;
             return -1;
         }
-        txtFile_ << "==================================================" << std::endl;
-        txtFile_ << "Observation Space: " << obsSpaceName << std::endl;
-        txtFile_ << "Analysis Time: " << timeWindow.midpoint().toString() << std::endl;
-        txtFile_ << "--------------------------------------------------" << std::endl;
+        txtFile_ << std::setfill('=') << std::setw(90) << "=" << std::endl;
+        txtFile_ << std::setfill(' '); // reset fill character
+        txtFile_ << "Observation Space: " << obsSpaceName 
+                 << "     Analysis Time: " << timeWindow.midpoint().toString()
+                 << "     nlocs=" << nlocs << std::endl;
+        txtFile_ << std::setfill('-') << std::setw(90) << "-" << std::endl;
+        txtFile_ << std::setfill(' '); // reset fill character
         if (hasChannels) {
             // use a different header if channels are present
             txtFile_ << std::left << std::setw(25) << "Obs Space"
                      << std::left << std::setw(25) << "Variable"
                      << std::left << std::setw(15) << "Group"
                      << std::left << std::setw(5) << "Chan"
-                     << std::left << std::setw(12) << "Use"
+                     << std::left << std::setw(14) << "Use"
                      << std::left << std::setw(8) << "Stat"
                      << std::endl;
-            txtFile_ << std::setfill('-') << std::setw(90) << "-" << std::endl;
+            txtFile_ << std::setfill('-') << std::setw(92) << "-" << std::endl;
             txtFile_ << std::setfill(' '); // reset fill character
         } else {
             // use a header that allows for vertical bins
             txtFile_ << std::left << std::setw(25) << "Obs Space"
                      << std::left << std::setw(25) << "Variable"
                      << std::left << std::setw(15) << "Group"
-                     << std::left << std::setw(12) << "Use"
+                     << std::left << std::setw(14) << "Use"
                      << std::left << std::setw(8) << "Stat"
                      << std::left << std::setw(3) << " | "
                      << std::right << std::setw(8) << "All Bins";
@@ -38,7 +42,7 @@ namespace dautils {
                      << std::right << std::setw(8) << bin;
             }
             txtFile_ << std::endl;
-            txtFile_ << std::setfill('-') << std::setw(96 + zBins.size() * 11) << "-" << std::endl;
+            txtFile_ << std::setfill('-') << std::setw(98 + zBins.size() * 11) << "-" << std::endl;
             txtFile_ << std::setfill(' '); // reset fill character
         }
         return 0;
@@ -57,7 +61,7 @@ namespace dautils {
         if (ch >= 0) {
             txtFile_ << std::left << std::setw(5) << ch;
         }
-        txtFile_ << std::left << std::setw(12) << assim
+        txtFile_ << std::left << std::setw(14) << assim
                 << std::left << std::setw(8) << statname;
         if (ch < 0) {
             for (const auto& val : values) {
@@ -90,11 +94,10 @@ namespace dautils {
         if (ch >= 0) {
             txtFile_ << std::left << std::setw(5) << ch;
         }
-        txtFile_ << std::left << std::setw(12) << assim
+        txtFile_ << std::left << std::setw(14) << assim
                 << std::left << std::setw(8) << statname;
         if (ch < 0) {
             for (const auto& val : values) {
-                std::cout << val << std::endl;
                 txtFile_ << std::left << std::setw(3) << " | "
                          << std::right << std::setw(8) << val[0];
             }

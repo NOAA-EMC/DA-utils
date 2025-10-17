@@ -2,127 +2,202 @@
 
 #include <cmath>
 
+#include "oops/util/Logger.h"
+#include "oops/util/missingValues.h"
+
 namespace dautils {
 
-std::vector<int> getObsCount(const std::vector<float> &data,
-                             const std::vector<int> &qcvals,
-                             const std::vector<int> &channels,
-                             const std::vector<int> &mask) {
+std::vector<std::vector<int>> getObsCount(const std::vector<float> &data,
+                                          const std::vector<int> &qcvals,
+                                          const std::vector<int> &channels,
+                                          const std::vector<int> &mask) {
   float fillVal = util::missingValue<float>();
-  std::vector<int> counts;
+  std::vector<std::vector<int>> counts;
   if (channels.empty()) {
-    int count(0);
+    int count_assim(0), count_mon(0), count_rej(0);
     for (size_t i = 0; i < data.size(); ++i) {
       if (data[i] != fillVal && qcvals[i] == 0 && mask[i] == 0) {
-        count += 1;
+        count_assim += 1;
+      } else if (data[i] != fillVal && qcvals[i] == 1 && mask[i] == 0) {
+        count_mon += 1;
+      } else if (data[i] != fillVal && qcvals[i] > 1 && mask[i] == 0) {
+        count_rej += 1;
       }
     }
-    counts.push_back(count);
+    counts.push_back({count_assim, count_mon, count_rej});
   } else {
     int _nlocs = data.size() / channels.size();
     for (int ch = 0; ch < channels.size(); ch++) {
-      int count(0);
+      int count_assim(0), count_mon(0), count_rej(0);
       for (size_t i = 0; i < _nlocs; ++i) {
         int ii = ch + (i * channels.size());
         if (data[ii] != fillVal && qcvals[ii] == 0 && mask[i] == 0) {
-          count += 1;
+          count_assim += 1;
+        } else if (data[ii] != fillVal && qcvals[ii] == 1 && mask[i] == 0) {
+          count_mon += 1;
+        } else if (data[ii] != fillVal && qcvals[ii] > 1 && mask[i] == 0) {
+          count_rej += 1;
         }
       }
-      counts.push_back(count);
+      counts.push_back({count_assim, count_mon, count_rej});
     }
   }
   return counts;
 }
 
 // -----------------------------------------------------------------------------
-std::vector<float> getMean(const std::vector<float> &data,
-                           const std::vector<int> &qcvals,
-                           const std::vector<int> &channels,
-                           const std::vector<int> &mask) {
+std::vector<std::vector<float>> getMean(const std::vector<float> &data,
+                                        const std::vector<int> &qcvals,
+                                        const std::vector<int> &channels,
+                                        const std::vector<int> &mask) {
   float fillVal = util::missingValue<float>();
-  std::vector<float> means;
+  std::vector<std::vector<float>> means;
   if (channels.empty()) {
-    int count(0);
-    float mean(0.0);
-    double sum(0.0);
+    int count_assim(0), count_mon(0), count_rej(0);
+    float mean_assim(0.0), mean_mon(0.0), mean_rej(0.0);
+    double sum_assim(0.0), sum_mon(0.0), sum_rej(0.0);
     for (size_t i = 0; i < data.size(); ++i) {
       if (data[i] != fillVal && qcvals[i] == 0 && mask[i] == 0) {
-        count += 1;
-        sum += data[i];
+        count_assim += 1;
+        sum_assim += data[i];
+      } else if (data[i] != fillVal && qcvals[i] == 1 && mask[i] == 0) {
+        count_mon += 1;
+        sum_mon += data[i];
+      } else if (data[i] != fillVal && qcvals[i] > 1 && mask[i] == 0) {
+        count_rej += 1;
+        sum_rej += data[i];
       }
     }
-    if (count > 0) {
-      mean = sum / count;
+    if (count_assim > 0) {
+      mean_assim = sum_assim / count_assim;
     } else {
-      mean = fillVal;
+      mean_assim = fillVal;
     }
-    means.push_back(mean);
+    if (count_mon > 0) {
+      mean_mon = sum_mon / count_mon;
+    } else {
+      mean_mon = fillVal;
+    }
+    if (count_rej > 0) {
+      mean_rej = sum_rej / count_rej;
+    } else {
+      mean_rej = fillVal;
+    }
+    means.push_back({mean_assim, mean_mon, mean_rej});
   } else {
     int _nlocs = data.size() / channels.size();
     for (int ch = 0; ch < channels.size(); ch++) {
-      int count(0);
-      float mean(0.0);
-      double sum(0.0);
+      int count_assim(0), count_mon(0), count_rej(0);
+      float mean_assim(0.0), mean_mon(0.0), mean_rej(0.0);
+      double sum_assim(0.0), sum_mon(0.0), sum_rej(0.0);
       for (size_t i = 0; i < _nlocs; ++i) {
         int ii = ch + (i * channels.size());
         if (data[ii] != fillVal && qcvals[ii] == 0 && mask[i] == 0) {
-          count += 1;
-          sum += data[ii];
+          count_assim += 1;
+          sum_assim += data[ii];
+        } else if (data[ii] != fillVal && qcvals[ii] == 1 && mask[i] == 0) {
+          count_mon += 1;
+          sum_mon += data[ii];
+        } else if (data[ii] != fillVal && qcvals[ii] > 1 && mask[i] == 0) {
+          count_rej += 1;
+          sum_rej += data[ii];
         }
       }
-      if (count > 0) {
-        mean = sum / count;
+      if (count_assim > 0) {
+        mean_assim = sum_assim / count_assim;
       } else {
-        mean = fillVal;
+        mean_assim = fillVal;
       }
-      means.push_back(mean);
+      if (count_mon > 0) {
+        mean_mon = sum_mon / count_mon;
+      } else {
+        mean_mon = fillVal;
+      }
+      if (count_rej > 0) {
+        mean_rej = sum_rej / count_rej;
+      } else {
+        mean_rej = fillVal;
+      }
+      means.push_back({mean_assim, mean_mon, mean_rej});
     }
   }
   return means;
 }
 
 // -----------------------------------------------------------------------------
-std::vector<float> getRMS(const std::vector<float> &data,
-                          const std::vector<int> &qcvals,
-                          const std::vector<int> &channels,
-                          const std::vector<int> &mask) {
+std::vector<std::vector<float>> getRMS(const std::vector<float> &data,
+                                       const std::vector<int> &qcvals,
+                                       const std::vector<int> &channels,
+                                       const std::vector<int> &mask) {
   float fillVal = util::missingValue<float>();
-  std::vector<float> rmsvals;
+  std::vector<std::vector<float>> rmsvals;
   if (channels.empty()) {
-    int count(0);
-    float rms(0.0);
-    double sum(0.0);
+    int count_assim(0), count_mon(0), count_rej(0);
+    float rms_assim(0.0), rms_mon(0.0), rms_rej(0.0);
+    double sum_assim(0.0), sum_mon(0.0), sum_rej(0.0);
     for (size_t i = 0; i < data.size(); ++i) {
       if (data[i] != fillVal && qcvals[i] == 0 && mask[i] == 0) {
-        count += 1;
-        sum += pow(data[i], 2);
+        count_assim += 1;
+        sum_assim += pow(data[i], 2);
+      } else if (data[i] != fillVal && qcvals[i] == 1 && mask[i] == 0) {
+        count_mon += 1;
+        sum_mon += pow(data[i], 2);
+      } else if (data[i] != fillVal && qcvals[i] > 1 && mask[i] == 0) {
+        count_rej += 1;
+        sum_rej += pow(data[i], 2);
       }
     }
-    if (count > 0) {
-      rms = sqrt(sum / count);
+    if (count_assim > 0) {
+      rms_assim = sqrt(sum_assim / count_assim);
     } else {
-      rms = fillVal;
+      rms_assim = fillVal;
     }
-    rmsvals.push_back(rms);
+    if (count_mon > 0) {
+      rms_mon = sqrt(sum_mon / count_mon);
+    } else {
+      rms_mon = fillVal;
+    }
+    if (count_rej > 0) {
+      rms_rej = sqrt(sum_rej / count_rej);
+    } else {
+      rms_rej = fillVal;
+    }
+    rmsvals.push_back({rms_assim, rms_mon, rms_rej});
   } else {
     int _nlocs = data.size() / channels.size();
     for (int ch = 0; ch < channels.size(); ch++) {
-      int count(0);
-      float rms(0.0);
-      double sum(0.0);
+      int count_assim(0), count_mon(0), count_rej(0);
+      float rms_assim(0.0), rms_mon(0.0), rms_rej(0.0);
+      double sum_assim(0.0), sum_mon(0.0), sum_rej(0.0);
       for (size_t i = 0; i < _nlocs; ++i) {
         int ii = ch + (i * channels.size());
         if (data[ii] != fillVal && qcvals[ii] == 0 && mask[i] == 0) {
-          count += 1;
-          sum += pow(data[ii], 2);
+          count_assim += 1;
+          sum_assim += pow(data[ii], 2);
+        } else if (data[ii] != fillVal && qcvals[ii] == 1 && mask[i] == 0) {
+          count_mon += 1;
+          sum_mon += pow(data[ii], 2);
+        } else if (data[ii] != fillVal && qcvals[ii] > 1 && mask[i] == 0) {
+          count_rej += 1;
+          sum_rej += pow(data[ii], 2);
         }
       }
-      if (count > 0) {
-        rms = sqrt(sum / count);
+      if (count_assim > 0) {
+        rms_assim = sqrt(sum_assim / count_assim);
       } else {
-        rms = fillVal;
+        rms_assim = fillVal;
       }
-      rmsvals.push_back(rms);
+      if (count_mon > 0) {
+        rms_mon = sqrt(sum_mon / count_mon);
+      } else {
+        rms_mon = fillVal;
+      }
+      if (count_rej > 0) {
+        rms_rej = sqrt(sum_rej / count_rej);
+      } else {
+        rms_rej = fillVal;
+      }
+      rmsvals.push_back({rms_assim, rms_mon, rms_rej});
     }
   }
   return rmsvals;

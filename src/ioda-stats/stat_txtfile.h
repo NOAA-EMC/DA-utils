@@ -17,7 +17,8 @@ namespace dautils {
       float fillVal_ = util::missingValue<float>();
 
       int initializeTxtFile(const std::string &filename, const util::TimeWindow &timeWindow,
-                            const std::string &obsSpaceName, bool hasChannels = false, std::vector<std::string> zBins = {});
+                            const std::string &obsSpaceName, const int &nlocs, bool hasChannels = false,
+                            std::vector<std::string> zBins = {});
       int writeTxtStat(const std::string &obsSpaceName, const std::string &variable,
                            const int &ch, const std::string &group, const std::string &assim,
                            const std::string &statname, const std::vector<std::vector<float>> &values);
