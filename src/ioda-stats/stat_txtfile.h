@@ -20,11 +20,11 @@ namespace dautils {
                             const std::string &obsSpaceName, const int &nlocs, bool hasChannels = false,
                             std::vector<std::string> zBins = {});
       int writeTxtStat(const std::string &obsSpaceName, const std::string &variable,
-                           const int &ch, const std::string &group, const std::string &assim,
-                           const std::string &statname, const std::vector<std::vector<float>> &values);
+                           const std::vector<int> &ch, const std::string &group, const std::string &statname,
+                           const std::vector<std::vector<std::vector<float>>> &values);
       int writeTxtStat(const std::string &obsSpaceName, const std::string &variable,
-                           const int &ch, const std::string &group, const std::string &assim,
-                           const std::string &statname, const std::vector<std::vector<int>> &values);
+                           const std::vector<int> &ch, const std::string &group, const std::string &statname,
+                           const std::vector<std::vector<std::vector<int>>> &values);
       int closeFile();
 
     private:

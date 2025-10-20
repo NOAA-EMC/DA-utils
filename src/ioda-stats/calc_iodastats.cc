@@ -219,7 +219,7 @@ void dautils::CalcIodaStats::run() {
         // if desired, get ranges of vertical bins for ascii reporting
         std::vector<std::string> asciiZBins;
         std::vector<float> asciiZBinRanges;
-        std::string asciiZBinVar;
+        std::string asciiZBinVar = "latitude"; // this is so that below when getting the total mask it works even if no vertical binning
         if (obsSpace.has("ascii vertical bins")) {
             eckit::LocalConfiguration asciiBinConfig;
             obsSpace.get("ascii vertical bins", asciiBinConfig);
@@ -318,24 +318,22 @@ void dautils::CalcIodaStats::run() {
                         }
                     }
                     // write to ASCII file
-                    // hard code some stuff for now
-                    int ch;
                     if (channels.empty()) {
-                        ch = -1;
+                        std::vector<int> ch = {-1};
                         if (stats[s] == "count") {
                             stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
-                                                  "assimilated", stats[s], intstat_reshaped[0]);
-                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
-                                                  "monitored", stats[s], intstat_reshaped[1]);
-                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
-                                                  "rejected", stats[s], intstat_reshaped[2]);
+                                                     stats[s], intstat_reshaped);
                         } else {
                             stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
-                                                  "assimilated", stats[s], floatstat_reshaped[0]);
-                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
-                                                  "monitored", stats[s], floatstat_reshaped[1]);
-                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], ch, groups[g],
-                                                  "rejected", stats[s], floatstat_reshaped[2]);
+                                                     stats[s], floatstat_reshaped);
+                        }
+                    } else {
+                        if (stats[s] == "count") {
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], channels, groups[g],
+                                                    stats[s], intstat_reshaped);
+                        } else {
+                            stattxtfile.writeTxtStat(obsSpaceName, variables[var], channels, groups[g],
+                                                    stats[s], floatstat_reshaped);
                         }
                     }
                 } // end of stats loop
@@ -343,6 +341,7 @@ void dautils::CalcIodaStats::run() {
         } // end of variable loop
         // close the ascii file
         stattxtfile.closeFile();
+        oops::Log::info() << "Finished writing ASCII stats for " << obsSpaceName << std::endl;
         // Now let's process the netCDF files by domains and/or bins
         // --------------------------------------------------------------------------
         // first, compute stats over specified domains (or global only)
@@ -413,12 +412,14 @@ void dautils::CalcIodaStats::run() {
                         } else {
                             oops::Log::info() << stats[s] << " not supported. Skipping." << std::endl;
                         }
+                        int nch = 1;
+                        if (!channels.empty()) nch = channels.size();
                         if (stats[s] == "count") {
-                            std::vector<int> intstat_assim, intstat_monit, intstat_rej;
-                            for (auto val : intstat) {
-                                intstat_assim.push_back(val[0]);
-                                intstat_monit.push_back(val[1]);
-                                intstat_rej.push_back(val[2]);
+                            std::vector<int> intstat_assim(nch), intstat_monit(nch), intstat_rej(nch);
+                            for (size_t ich = 0; ich < nch; ich++) {
+                                intstat_assim[ich] = intstat[ich][0];
+                                intstat_monit[ich] = intstat[ich][1];
+                                intstat_rej[ich] = intstat[ich][2];
                             }
                             statncfile.writeByDomains(outncfile, groups[g], variables[var],
                                                     "assimilated_" + stats[s], idom, intstat_assim);
@@ -427,11 +428,11 @@ void dautils::CalcIodaStats::run() {
                             statncfile.writeByDomains(outncfile, groups[g], variables[var],
                                                     "rejected_" + stats[s], idom, intstat_rej);
                         } else {
-                            std::vector<float> floatstat_assim, floatstat_monit, floatstat_rej;
-                            for (auto val : floatstat) {
-                                floatstat_assim.push_back(val[0]);
-                                floatstat_monit.push_back(val[1]);
-                                floatstat_rej.push_back(val[2]);
+                            std::vector<float> floatstat_assim(nch), floatstat_monit(nch), floatstat_rej(nch);
+                            for (size_t ich = 0; ich < nch; ich++) {
+                                floatstat_assim[ich] = floatstat[ich][0];
+                                floatstat_monit[ich] = floatstat[ich][1];
+                                floatstat_rej[ich] = floatstat[ich][2];
                             }
                             statncfile.writeByDomains(outncfile, groups[g], variables[var],
                                                     "assimilated_" + stats[s], idom, floatstat_assim);
@@ -570,6 +571,7 @@ void dautils::CalcIodaStats::run() {
                                 std::vector<std::vector<int>> fullintstat_monitored(nbins_y, std::vector<int>(nbins_x,0.0));
                                 std::vector<std::vector<float>> fullfloatstat_rejected(nbins_y, std::vector<float>(nbins_x,0.0));
                                 std::vector<std::vector<int>> fullintstat_rejected(nbins_y, std::vector<int>(nbins_x,0.0));
+                                
                                 for (int iy=0; iy < nbins_y; iy++) {
                                     for (int ix=0; ix < nbins_x; ix++) {
                                         ibin = ix + (iy * nbins_x) + (idom * nbins_x * nbins_y);
@@ -638,6 +640,8 @@ void dautils::CalcIodaStats::run() {
                               std::vector<std::vector<float>>(nbins_y,std::vector<float>(nbins_x, 0.0)));
                             std::vector<std::vector<std::vector<int>>> fullintstat_rejected(channels.size(),
                               std::vector<std::vector<int>>(nbins_y,std::vector<int>(nbins_x, 0.0)));
+                            int nch = 1;
+                            if (!channels.empty()) nch = channels.size();
                             int ibin = 0;
                             for (int iy=0; iy < nbins_y; iy++) {
                                 for (int ix=0; ix < nbins_x; ix++) {
@@ -654,11 +658,15 @@ void dautils::CalcIodaStats::run() {
                                         floatstat = getRMS(buffer, qcflag, channels, binmask[ibin]);
                                     }
                                     // loop over channels
-                                    for (int ich = 0; ich < channels.size(); ich++ ) {
+                                    for (int ich = 0; ich < nch; ich++ ) {
                                         if (stats[s] == "count") {
-                                            fullintstat_assim[ich][iy][ix] = intstat[0][ich];
+                                            fullintstat_assim[ich][iy][ix] = intstat[ich][0];
+                                            fullintstat_monitored[ich][iy][ix] = intstat[ich][1];
+                                            fullintstat_rejected[ich][iy][ix] = intstat[ich][2];
                                         } else {
-                                            fullfloatstat_assim[ich][iy][ix] = floatstat[0][ich];  
+                                            fullfloatstat_assim[ich][iy][ix] = floatstat[ich][0];
+                                            fullfloatstat_monitored[ich][iy][ix] = floatstat[ich][1];
+                                            fullfloatstat_rejected[ich][iy][ix] = floatstat[ich][2];
                                         }
                                     }
                                 }
@@ -705,8 +713,8 @@ void dautils::convertLongitudes(std::vector<float>& longitudes) {
     // Check if longitudes are in 0-360 range
     // If min is >= 0 and max is > 180, we assume 0-360 range
     if (minLon >= 0.0 && maxLon > 180.0) {
-        oops::Log::info() << "Converting longitudes from 0-360 to -180 to 180 range" << std::endl;
-        oops::Log::info() << "Original range: [" << minLon << ", " << maxLon << "]" << std::endl;
+        oops::Log::debug() << "Converting longitudes from 0-360 to -180 to 180 range" << std::endl;
+        oops::Log::trace() << "Original range: [" << minLon << ", " << maxLon << "]" << std::endl;
         
         // Convert: if lon > 180, subtract 360
         for (auto& lon : longitudes) {
@@ -722,6 +730,6 @@ void dautils::convertLongitudes(std::vector<float>& longitudes) {
             if (lon < minLon) minLon = lon;
             if (lon > maxLon) maxLon = lon;
             }
-        oops::Log::info() << "Converted range: [" << minLon << ", " << maxLon << "]" << std::endl;
+        oops::Log::trace() << "Converted range: [" << minLon << ", " << maxLon << "]" << std::endl;
     }
 }
