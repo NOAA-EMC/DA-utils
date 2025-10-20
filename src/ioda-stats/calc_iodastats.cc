@@ -586,7 +586,6 @@ void dautils::CalcIodaStats::run() {
                                         } else if (stats[s] == "RMS") {
                                             floatstat = getRMS(buffer, qcflag, channels, binmask[ibin]);
                                         }
-                                                                    std::vector<int> intstat_assim, intstat_monit, intstat_rej;
 
                                         if (stats[s] == "count") {
                                             std::vector<int> intstat_assim, intstat_monit, intstat_rej;

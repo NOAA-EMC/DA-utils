@@ -5,13 +5,12 @@
 
 namespace dautils {
   class CalcIodaStats {
-    public :
+    public:
       // -----------------------------------------------------------------------------
       CalcIodaStats(const eckit::Configuration & fullConfig,
                     const eckit::mpi::Comm & comm = oops::mpi::world())
         : config_(fullConfig), comm_(comm)
         {}
-    public:
       void run();
     private:
       const eckit::Configuration & config_;

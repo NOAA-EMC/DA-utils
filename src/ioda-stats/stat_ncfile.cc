@@ -70,7 +70,7 @@ int StatNcFile::initializeNcfile(const std::string filename, const util::TimeWin
   // create vertical bin variable
   if (channels.empty() && bins_z.size() > 0 && (nbins_x > 0 || nbins_y > 0)) {
     netCDF::NcVar zbins = ncFile.addVar("verticalBin", netCDF::ncString, zDim);
-    for (int ibin = 0; ibin < bins_z.size(); ibin++) {
+    for (size_t ibin = 0; ibin < bins_z.size(); ibin++) {
       std::vector<size_t> idxbin;
       idxbin.push_back(ibin);
       zbins.putVar(idxbin, bins_z[ibin]);
@@ -79,17 +79,17 @@ int StatNcFile::initializeNcfile(const std::string filename, const util::TimeWin
 
   // loop over group, then variables, then stats to create byDomains/group/var/stat in file
   netCDF::NcGroup domaingroup = ncFile.addGroup("byDomains");
-  for (int g = 0; g < groups.size(); g++) {
+  for (size_t g = 0; g < groups.size(); g++) {
     // create group group
     netCDF::NcGroup group = domaingroup.addGroup(groups[g]);
     // loop over variables
-    for (int var = 0; var < variables.size(); var++) {
+    for (size_t var = 0; var < variables.size(); var++) {
       // create variable group
       netCDF::NcGroup group2 = group.addGroup(variables[var]);
       // loop over statistics to write out
-      for (int s = 0; s < stats.size(); s++) {
+      for (size_t s = 0; s < stats.size(); s++) {
         // loop over use_categories
-        for (int c = 0; c < use_categories.size(); c++) {
+        for (size_t c = 0; c < use_categories.size(); c++) {
           netCDF::NcVar varout;
           if (stats[s] == "count") {
             varout = group2.addVar(use_categories[c] + "_" + stats[s], netCDF::ncInt, domainDimVector);
@@ -130,17 +130,17 @@ int StatNcFile::initializeNcfile(const std::string filename, const util::TimeWin
       lonVar.putVar(start, count, bin_lons.data());
     }
     
-    for (int g = 0; g < groups.size(); g++) {
+    for (size_t g = 0; g < groups.size(); g++) {
       // create group group
       netCDF::NcGroup group = bingroup.addGroup(groups[g]);
       // loop over variables
-      for (int var = 0; var < variables.size(); var++) {
+      for (size_t var = 0; var < variables.size(); var++) {
         // create variable group
         netCDF::NcGroup group2 = group.addGroup(variables[var]);
         // loop over statistics to write out
-        for (int s = 0; s < stats.size(); s++) {
+        for (size_t s = 0; s < stats.size(); s++) {
           // loop over use categories
-          for (int c = 0; c < use_categories.size(); c++) {
+          for (size_t c = 0; c < use_categories.size(); c++) {
             netCDF::NcVar varout;
             if (stats[s] == "count") {
               varout = group2.addVar(use_categories[c] + "_" + stats[s], netCDF::ncInt, binningDimVector);
