@@ -900,10 +900,13 @@ class Conv(BaseGSI):
         # loop through obsvariables and platforms to do processing
         if "ges" in self.filename:
             diagtype = "_ges_"
+            varsuffix = "Ges"
         elif "anl" in self.filename:
             diagtype = "_anl_"
+            varsuffix = "Anl"
         else:
             diagtype = "_obs_"
+            varsuffix = ""
         for v in self.obsvars:
             for p in platforms:
                 # set up a NcWriter class
@@ -1013,7 +1016,7 @@ class Conv(BaseGSI):
                     for key, value in gsivars.items():
                         if key in self.df.variables:
                             df_key = self.var(key)
-                            gvname = outvars[o], value
+                            gvname = outvars[o], value + varsuffix
                             # some special actions need to be taken depending on
                             # var name...
                             if ("Forecast" in key) and (v == 'uv'):
@@ -1066,11 +1069,11 @@ class Conv(BaseGSI):
                                 tmp = df_key[idx]
                                 outdata[gvname] = tmp
                     # create a GSI effective QC variable
-                    gsiqcname = outvars[o], 'GsiEffectiveQC'
-                    errname = outvars[o], 'GsiFinalObsError'
+                    gsiqcname = outvars[o], 'GsiEffectiveQC' + varsuffix
+                    errname = outvars[o], 'GsiFinalObsError' + varsuffix
                     gsiqc = np.zeros_like(obsdata)
                     gsiqc[outdata[errname] == 1e8] = 1
-                    gsiqc[outdata[(outvars[o], "GsiUseFlag")] < 0] = 1
+                    gsiqc[outdata[(outvars[o], "GsiUseFlag" + varsuffix)] < 0] = 1
                     outdata[gsiqcname] = gsiqc.astype(np.int32)
                     varAttrs[gsiqcname]['_FillValue'] = self.INT_FILL
                     # store values in output data dictionary
@@ -1411,10 +1414,13 @@ class Radiances(BaseGSI):
         # set up a NcWriter class
         if "ges" in self.filename:
             diagtype = "_ges_"
+            varsuffix = "Ges"
         elif "anl" in self.filename:
             diagtype = "_anl_"
+            varsuffix = "Anl"
         else:
             diagtype = "_obs_"
+            varsuffix = ""
         outname = OutDir + '/' + self.sensor + '_' + self.satellite + \
             diagtype + self.validtime.strftime("%Y%m%d%H") + '.nc4'
         if not clobber:
@@ -1647,7 +1653,7 @@ class Radiances(BaseGSI):
                     tmp = tmp.astype(np.int32)
                 else:
                     tmp[tmp > 4e8] = self.FLOAT_FILL
-                gvname = "brightnessTemperature", iodavar
+                gvname = "brightnessTemperature", iodavar + varsuffix
                 outdata[gvname] = np.reshape(tmp, (nlocs, nchans))
                 VarDims[gvname] = ['Location', 'Channel']
 
@@ -1657,7 +1663,7 @@ class Radiances(BaseGSI):
             key2 = 'Obs_Minus_Forecast_unadjusted'
             if key1 in self.df.variables.keys() and key2 in self.df.variables.keys():
                 tmp = self.var(key1) - self.var(key2)
-                iodavar = 'GsiBc'
+                iodavar = 'GsiBc' + varsuffix
                 gvname = "brightnessTemperature", iodavar
                 outdata[gvname] = np.reshape(tmp, (nlocs, nchans))
                 VarDims[gvname] = ['Location', 'Channel']
@@ -1675,8 +1681,8 @@ class Radiances(BaseGSI):
         outdata[varDict[value]['qcKey']] = np.reshape(obsqc.astype(np.int32), (nlocs, nchans))
 
         # create a GSI effective QC variable (group)
-        gsiqcname = value, 'GsiEffectiveQC'
-        errname = value, 'GsiFinalObsError'
+        gsiqcname = value, 'GsiEffectiveQC' + varsuffix
+        errname = value, 'GsiFinalObsError' + varsuffix
         gsiqc = np.zeros_like(outdata[varDict[value]['valKey']])
         gsiqc[outdata[errname] > 1.0e8] = 1
         gsiqc[np.reshape(self.var('QC_Flag'), (nlocs, nchans)) < 0] = 1
@@ -1684,13 +1690,13 @@ class Radiances(BaseGSI):
 
         # create a GSI related variable (group)
         varAttrs[errname]['units'] = 'K'
-        grpname = value, 'GsiBc'
+        grpname = value, 'GsiBc' + varsuffix
         varAttrs[grpname]['units'] = 'K'
-        grpname = value, 'GsiHofXBc'
+        grpname = value, 'GsiHofXBc' + varsuffix
         varAttrs[grpname]['units'] = 'K'
-        grpname = value, 'GsiHofX'
+        grpname = value, 'GsiHofX' + varsuffix
         varAttrs[grpname]['units'] = 'K'
-        grpname = value, 'GsiHofXClr'
+        grpname = value, 'GsiHofXClr' + varsuffix
         varAttrs[grpname]['units'] = 'K'
 
         if (ObsBias):
@@ -1861,10 +1867,13 @@ class Ozone(BaseGSI):
         # set up a NcWriter class
         if "ges" in self.filename:
             diagtype = "_ges_"
+            varsuffix = "Ges"
         elif "anl" in self.filename:
             diagtype = "_anl_"
+            varsuffix = "Anl"
         else:
             diagtype = "_obs_"
+            varsuffix = ""
         outname = OutDir+'/'+self.sensor+'_'+self.satellite+diagtype+self.validtime.strftime("%Y%m%d%H")+'.nc4'
         if not clobber:
             if (os.path.exists(outname)):
@@ -1944,7 +1953,7 @@ class Ozone(BaseGSI):
                     tmp = tmp.astype(np.int32)
                 else:
                     tmp[tmp > 4e8] = self.FLOAT_FILL
-                gvname = vname, iodavar
+                gvname = vname, iodavar + varsuffix
                 outdata[gvname] = tmp
                 if vname in units_values.keys():
                     varAttrs[gvname]['units'] = units_values[vname]
@@ -1954,7 +1963,7 @@ class Ozone(BaseGSI):
                 key2 = 'Obs_Minus_Forecast_unadjusted'
                 if key1 in self.df.variables.keys() and key2 in self.df.variables.keys():
                     tmp = self.var(key1) - self.var(key2)
-                    iodavar = 'GsiBc'
+                    iodavar = 'GsiBc' + varsuffix
                     gvname = vname, iodavar
                     outdata[gvname] = np.reshape(tmp, (nlocs))
                     VarDims[gvname] = ['Location']
@@ -1967,8 +1976,8 @@ class Ozone(BaseGSI):
         outdata[varDict[vname]['qcKey']] = obsqc
 
         # create a GSI effective QC variable (group)
-        gsiqcname = vname, 'GsiEffectiveQC'
-        errname = vname, 'GsiFinalObsError'
+        gsiqcname = vname, 'GsiEffectiveQC' + varsuffix
+        errname = vname, 'GsiFinalObsError' + varsuffix
         gsiqc = np.zeros_like(outdata[varDict[vname]['valKey']])
         gsiqc[outdata[errname] > 1e8] = 1
         outdata[gsiqcname] = gsiqc.astype(np.int32)
