@@ -31,9 +31,10 @@ namespace dautils {
                      << std::left << std::setw(3) << "   "
                      << std::left << std::setw(11) << "rejected"
                      << std::endl;
-            txtFile_ << std::setfill('-') << std::setw(92) << "-" << std::endl;
+            txtFile_ << std::setfill('-') << std::setw(126) << "-" << std::endl;
             txtFile_ << std::setfill(' '); // reset fill character
         } else {
+
             // use a header that allows for vertical bins
             txtFile_ << std::left << std::setw(25) << "Obs Space"
                      << std::left << std::setw(25) << "Variable"
