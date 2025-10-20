@@ -2,6 +2,7 @@
 
 #include "eckit/config/LocalConfiguration.h"
 #include "eckit/mpi/Comm.h"
+#include "oops/mpi/mpi.h"
 
 namespace dautils {
   class CalcIodaStats {
