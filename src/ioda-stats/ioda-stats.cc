@@ -1,4 +1,4 @@
-#include "iodastats.h"
+#include "ioda-stats.h"
 #include "oops/runs/Run.h"
 
 // This application preprocesses observation space
