@@ -204,7 +204,7 @@ def combine_ges_anl_ioda(ges_ioda_file, anl_ioda_file, out_ioda_file):
                             out_var[:] = var[:]
             # create ombg and oman variables in out file
             ges_group_hofx = ges_ds.groups.get('GsiHofXBcGes')
-            ges_group_obs = ges_ds.groups.get('ObsValueGes')
+            ges_group_obs = ges_ds.groups.get('ObsValue')
             anl_group_hofx = anl_ds.groups.get('GsiHofXBcAnl')
             for var_name, var in ges_group_hofx.variables.items():
                 # get observed value
@@ -225,7 +225,7 @@ def combine_ges_anl_ioda(ges_ioda_file, anl_ioda_file, out_ioda_file):
                     if attr_name != '_FillValue':  # avoid issues with _FillValue
                         out_var_an.setncattr(attr_name, var.getncattr(attr_name))
                     # copy variable data
-                out_var_anl[:] = obvalue - anl_group_hofx.variables[var_name][:]
+                out_var_an[:] = obvalue - anl_group_hofx.variables[var_name][:]
 
         print(f"Combined GSI IODA file created: {out_ioda_file}")
 
