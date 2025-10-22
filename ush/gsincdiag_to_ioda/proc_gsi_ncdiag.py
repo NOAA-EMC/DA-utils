@@ -106,7 +106,7 @@ def proc_gsi_ncdiag(ObsDir=False, ObsBias=False, TotalBias=False, QCVars=False, 
         for radfile in radfiles:
             process = False
             for p in gsid.rad_sensors:
-                if p in radfile:
+                if p in radfile.split('/')[-1]:
                     process = True
             if process:
                 run_radiances_obs(radfile, ObsDir, ObsBias, TotalBias, QCVars, TestRefs)
@@ -116,7 +116,7 @@ def proc_gsi_ncdiag(ObsDir=False, ObsBias=False, TotalBias=False, QCVars=False, 
             process = False
             oz_sensors = gsid.oz_lay_sensors + gsid.oz_lev_sensors
             for p in oz_sensors:
-                if p in radfile:
+                if p in radfile.split('/')[-1]:
                     process = True
             if process:
                 run_oz_obs(radfile, ObsDir, TotalBias=TotalBias)
