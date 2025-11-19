@@ -25,9 +25,10 @@
 #include "ioda/ObsGroup.h"
 #include "ioda/ObsSpace.h"
 #include "ioda/ObsVector.h"
-// add these headers for reading variable's values
+// [Hyundeok] add these headers for reading variable's values
 #include "ioda/Engines/ObsStore.h"
 #include "ioda/Variables/Variable.h"
+//
 
 #include "oops/base/PostProcessor.h"
 #include "oops/mpi/mpi.h"
@@ -78,10 +79,10 @@ namespace dautils {
         throw eckit::Exception("Either 'input directory' or 'input files' must be specified");
       }
 
-      // get "variables", "count", and "channel" from yaml if it has
+      // [Hyundeok] get "variables" and "count" from yaml if it has
       std::vector<std::string> previewVars;
       size_t previewCount = 10;  // default if it doesn't have
-      size_t indexChannel = 0;   // default if it doesn't have
+      size_t indexChannel = 0;  // default if it doesn't have
 
       if (fullConfig.has("variables")) {
          fullConfig.get("variables", previewVars);
@@ -93,7 +94,7 @@ namespace dautils {
          fullConfig.get("channel", indexChannel);
       }
 
-      // logging
+      // [Hyundeok] logging
       oops::Log::info() << "Preview count set to: " << previewCount << std::endl;
       if (!previewVars.empty()) {
          oops::Log::info() << "Preview variables:" << std::endl;
@@ -128,7 +129,7 @@ namespace dautils {
       for (const auto& file : myFiles) {
         try {
           FileInfo info = processFile(file, timeWindow, mycomm,
-                                      previewVars, previewCount, indexChannel);    
+                                      previewVars, previewCount, indexChannel);    //[Hyundeok]
           fileInfos.push_back(info);
         } catch (const std::exception& e) {
           oops::Log::warning() << "Failed to process file " << file << ": " << e.what() << std::endl;
@@ -241,9 +242,9 @@ namespace dautils {
     FileInfo processFile(const std::string& filename,
                          const util::TimeWindow& timeWindow,
                          const eckit::mpi::Comm & comm,
-                         const std::vector<std::string>& previewVars,   
+                         const std::vector<std::string>& previewVars,   //[Hyundeok]
                          size_t previewCount,
-                         size_t indexChannel) const { 
+                         size_t indexChannel) const {                   //[Hyundeok]
       FileInfo info;
       info.filename = filename;
       info.success = false;
@@ -258,7 +259,7 @@ namespace dautils {
         std::string ext = filename.substr(filename.find_last_of('.')+1);
         std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);     // lowercase
 
-// Engine Type Selection based on the files
+// [Hyundeok] Engine Type Selection based on the files
 
         if (ext == "nc" || ext == "nc4" || ext == "h5" || ext == "hdf5") {
            obsConfig.set("obsdatain.engine.type", "H5File");
@@ -285,6 +286,7 @@ namespace dautils {
            oops::Log::info() << "IODA-Dump: Engine type = ODB" << std::endl;
            oops::Log::info() << "IODA-Dump: Using query file: " << queryFile << std::endl;
 
+
         }  else if (ext == "bufr") {
            obsConfig.set("obsdatain.engine.type", "BUFRFile");
         }  else {
@@ -308,16 +310,29 @@ namespace dautils {
         info.nrecs = ospace.nrecs();
         oops::Log::info() << filename << ": nrecs = " << info.nrecs << std::endl;
 
+/*
+        // Avoid print thousands of rows
+//        previewCount = std::min(info.nobs, static_cast<size_t>(5));
+        size_t previewCount = info.nobs;  // default to nobs
+
+        if (config["count"]) {
+           previewCount = config["count"].as<size_t>();
+        }
+
+// Cap at 20
+        previewCount = std::min(previewCount, static_cast<size_t>(20));
+*/
+
         // get ObsValue variables
         std::vector<std::string> allVars = ospace.listVariables();
 
-        // list Variables
+        // [Hyundeok] list Variables
         std::cout << "Variables in ospace:" << std::endl;
         for (const auto& var : allVars) {
            std::cout << "  " << var << std::endl;
         }
 
-        // Identify MetaData/ObsValue variables by convention (those that start with "MetaData/ObsValue")
+        // [Hyundeok] Identify MetaData/ObsValue variables by convention (those that start with "MetaData/ObsValue")
         info.metaDataVars.clear();
         for (const auto& var : allVars) {
             if (var.find("MetaData") == 0) {
@@ -331,8 +346,9 @@ namespace dautils {
         oops::Log::info() << filename << ": Found " << info.obsValueVars.size() << " ObsValue variables" << std::endl;
         info.success = true;
 
-        // Step 1: Extract MetaData/satelliteIdentifier
+        // [Hyundeok] Step 1: Extract MetaData/satelliteIdentifier
         std::vector<int> satIDs(info.nobs);
+//      std::set<int> uniqueSorted;
         std::map<int, size_t> satIDCounts;   // satID -> count
         std::vector<std::string> satIDStrings;
         try {
@@ -349,11 +365,17 @@ namespace dautils {
                    oss << kv.first << "(" << kv.second << ")";
                    satIDStrings.push_back(oss.str());
                 }
-
+/*              uniqueSorted = std::set<int>(satIDs.begin(), satIDs.end());
+                for (const auto& id : uniqueSorted) {
+                    satIDStrings.push_back(std::to_string(id));
+                }
+*/
                 // Log to console
                 std::cout << "Unique satelliteIdentifier values found in " << filename << ":\n";
-
-		for (const auto& kv : satIDCounts) {
+//                for (const auto& id : uniqueSorted) {
+//                    std::cout << "  " << id << "\n";
+//                }
+                for (const auto& kv : satIDCounts) {
                    std::cout << "  " << kv.first << " (" << kv.second << ")\n";
                 }
 
@@ -363,7 +385,7 @@ namespace dautils {
         oops::Log::warning() << "Could not read MetaData/satelliteIdentifier: " << e.what() << std::endl;
         }
 
-        // Extract MetaData/dateTime
+        // [Hyundeok] Extract MetaData/dateTime
         std::vector<int> dateIDs(info.nobs);
         try {
            ospace.get_db("MetaData", "dateTime", dateIDs);
@@ -401,7 +423,7 @@ namespace dautils {
         oops::Log::warning() << "Could not read MetaData/dateTime: " << e.what() << std::endl;
         }
 
-        // Assume the data is of type 'float'
+        // [Hyundeok] Assume the data is of type 'float'
         size_t nchans = (info.nchans > 0) ? info.nchans : 1;
         size_t totalSize = info.nobs * nchans;
 
@@ -425,12 +447,26 @@ namespace dautils {
             try {
                 // 1D data (no channels)
                 // 2D data (with channels), get_db() will read all channels into the 1D vector
+//              oops::Log::debug() << "Attempting to read: " << group << "/" << variable << std::endl;
                 ospace.get_db(group, variable, obsData);
             } catch (const ioda::Exception& e) {
               oops::Log::info() << "Skipping missing variable: " << group << "/" << variable << std::endl;
+              //comment out to remove unnecessary info for not exiting variables
+              //oops::Log::error() << "Failed to read " << varName << ". Error: " << e.what() << std::endl;
               continue; // Skip to the next variable
             }
 
+/*
+               if (nchans == 1) {               // 1D data (no channels)
+                 ospace.get_db(group, variable, obsData);
+               } else {                         // 2D data (with channels), get_db() will read all channels into the 1D vector
+                 ospace.get_db(group, variable, obsData);
+               }
+            } catch (const std::exception& e) {
+                 oops::Log::error() << "Failed to read " << varName << ". Error: " << e.what() << std::endl;
+                 continue; // Skip to the next variable
+            }
+*/
             // === 3. Print values and store them for the report ===
             oops::Log::info() << "--- Displaying data for first " << previewCount
                               << "location of " << varName << " ---" << std::endl;
@@ -541,7 +577,7 @@ namespace dautils {
         buffer.insert(buffer.end(), reinterpret_cast<const char*>(&info.nrecs),
                      reinterpret_cast<const char*>(&info.nrecs) + sizeof(size_t));
 
-        // Serialize MetaDataVars vector
+        // [Hyundeok] Serialize MetaDataVars vector
         size_t metaVarsCount = info.metaDataVars.size();
         buffer.insert(buffer.end(), reinterpret_cast<const char*>(&metaVarsCount),
                      reinterpret_cast<const char*>(&metaVarsCount) + sizeof(size_t));
@@ -563,7 +599,7 @@ namespace dautils {
           buffer.insert(buffer.end(), var.begin(), var.end());
         }
 
-        // Serialize previewData map
+        //[Hyundeok] Serialize previewData map
         size_t mapSize = info.previewData.size();
         buffer.insert(buffer.end(), reinterpret_cast<const char*>(&mapSize),
                      reinterpret_cast<const char*>(&mapSize) + sizeof(size_t));
@@ -625,7 +661,7 @@ namespace dautils {
         std::memcpy(&info.nrecs, buffer.data() + pos, sizeof(size_t));
         pos += sizeof(size_t);
 
-        // Deserialize MetaDataVars vector
+        // [Hyundeok] Deserialize MetaDataVars vector
         size_t metaVarsCount;
         std::memcpy(&metaVarsCount, buffer.data() + pos, sizeof(size_t));
         pos += sizeof(size_t);
@@ -651,7 +687,7 @@ namespace dautils {
           pos += varLen;
         }
 
-        // Deserialize previewData map
+        // [Hyundeok] Deserialize previewData map
         size_t mapSize;
         std::memcpy(&mapSize, buffer.data() + pos, sizeof(size_t));
         pos += sizeof(size_t);
@@ -731,13 +767,14 @@ namespace dautils {
 
           auto satIt = info.previewData.find("MetaData/satelliteIdentifier_unique_sorted");
           if (satIt != info.previewData.end()) {
+//             outFile << "  " << satIt->first << ":\n";
              outFile << "MetaData/satelliteIdentifier:\n";
              for (const std::string& line : satIt->second) {
                 outFile << "    " << line << "\n";
              }
           }
 
-          // print start and end date/Time
+// print start and end date/Time
           if (info.previewData.find("MetaData/dateTime_unique_sorted") != info.previewData.end()) {
              const std::vector<std::string>& dateIDStrings = info.previewData.at("MetaData/dateTime_unique_sorted");
 
@@ -749,12 +786,14 @@ namespace dautils {
                 outFile << "No valid dateTime entries found.\n";
              }
           }
+//
+
 
           outFile << "Number of observations (nobs): " << info.nobs << "\n";
           outFile << "Number of records (nrecs): " << info.nrecs << "\n";
           outFile << "Number of channels (nchans): " << info.nchans << "\n";
 
-          // print out metaData variables w/ size
+          // [Hyundeok] print out metaData variables w/ size
           if (!info.metaDataVars.empty()) {
             outFile << "MetaData variables (" << info.metaDataVars.size() << "):\n";
             for (size_t i = 0; i < info.metaDataVars.size(); ++i) {
@@ -764,6 +803,7 @@ namespace dautils {
             outFile << "MetaData variables: None detected\n";
           }
 
+          //
           if (!info.obsValueVars.empty()) {
             outFile << "ObsValue variables (" << info.obsValueVars.size() << "):\n";
             for (size_t i = 0; i < info.obsValueVars.size(); ++i) {
@@ -773,9 +813,9 @@ namespace dautils {
             outFile << "ObsValue variables: None detected\n";
           }
 
-          // table view
+// [Hyundeok] table view
           outFile << "Preview Data (" << previewCount << "):\n";
-          const int colWidth = 20;
+          const int colWidth = 24;
 
           if (!info.previewData.empty()) {
              // Extract variable names from previewData
@@ -829,6 +869,11 @@ namespace dautils {
                     size_t colonPos = val.find(':');
                     std::string raw = (colonPos != std::string::npos) ? val.substr(colonPos + 1) : val;
 
+/*                    // Split space-separated values and take the first one
+                    std::istringstream iss(raw);
+                    std::string firstChannel;
+                    iss >> firstChannel;
+*/
                     // Tokenize the raw string into channel values
                     std::istringstream iss(raw);
                     std::vector<std::string> channels;
@@ -837,14 +882,34 @@ namespace dautils {
                            channels.push_back(token);
                     }
 
+//                    outFile << std::setw(colWidth) << std::left << firstChannel;
 
-                    // Choose which channel to print by indexChannel (default: first channel)
+                    // Choose which channel to print (default: first channel)
+                    //int channelIndex = 5;  // 0 = first, 1 = second, etc.
                     if (indexChannel < static_cast<int>(channels.size())) {
                        outFile << std::setw(colWidth) << std::left << channels[indexChannel];
                     } else {
                        outFile << std::setw(colWidth) << std::left << "";  // empty if not available
                     }
-  
+/*
+                    if (indexChannel < static_cast<int>(channels.size())) {
+                       std::string entry = channels[indexChannel];  // e.g. "784(120)"
+
+                       // Find the '(' that separates ID and count
+                       size_t parenPos = entry.find('(');
+                       if (parenPos != std::string::npos) {
+                          std::string id    = entry.substr(0, parenPos);                  // "784"
+                          std::string count = entry.substr(parenPos + 1, entry.find(')', parenPos) - parenPos - 1); // "120"
+
+                          outFile << std::setw(colWidth) << std::left << (id + " : " + count + " obs");
+                       } else {
+                          // fallback if no parentheses found
+                          outFile << std::setw(colWidth) << std::left << entry;
+                       }
+                    } else {
+                       outFile << std::setw(colWidth) << std::left << "";  // empty if not available
+                    }
+*/
                 }
                 outFile << "\n";
              }
