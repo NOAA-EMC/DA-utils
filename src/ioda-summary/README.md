@@ -1,4 +1,4 @@
-# ioda-dump.x — IODA file summary dumper
+# ioda-summary.x — IODA file summary 
 
 A small utility that reads IODA observation files (HDF5/NetCDF) and writes a formatted ASCII summary. It can scan a directory or process an explicit list of files and supports MPI execution.
 
@@ -14,29 +14,29 @@ The summary is written to a single text file you choose.
 
 This program is part of `da-utils` and is built with Ecbuild/CMake.
 
-- Target name: `ioda-dump.x`
+- Target name: `ioda-summary.x`
 - Language standard: C++17
 - Linked libraries: `oops`, `ioda` (and their transitive deps, eckit, etc.)
 
 It is automatically included by the top-level `CMakeLists.txt` via:
 ```
-add_subdirectory( ioda-dump )
+add_subdirectory( ioda-summary )
 ```
 
-If you are building the whole bundle, the executable will appear under your build tree, typically `build/bin/ioda-dump.x` after a successful `make`.
+If you are building the whole bundle, the executable will appear under your build tree, typically `build/bin/ioda-summary.x` after a successful `make`.
 
 ## Usage
 
 Basic usage is to pass a YAML configuration file:
 
 ```
-./ioda-dump.x path/to/config.yaml
+./ioda-summary.x path/to/config.yaml
 ```
 
 MPI is supported; for example with 4 processes:
 
 ```
-mpirun -np 4 ./ioda-dump.x path/to/config.yaml
+mpirun -np 4 ./ioda-summary.x path/to/config.yaml
 ```
 
 Files are distributed across ranks in a round-robin fashion, and all results are automatically gathered to rank 0 for output to the summary file.

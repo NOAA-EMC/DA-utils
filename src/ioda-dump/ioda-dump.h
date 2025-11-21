@@ -25,7 +25,7 @@
 #include "ioda/ObsGroup.h"
 #include "ioda/ObsSpace.h"
 #include "ioda/ObsVector.h"
-// add these headers for reading variable's values
+
 #include "ioda/Engines/ObsStore.h"
 #include "ioda/Variables/Variable.h"
 
@@ -66,22 +66,31 @@ namespace dautils {
       // get input configuration - can be directory or list of files
       std::vector<std::string> inputFiles;
       if (fullConfig.has("input directory")) {
-        std::string inputDir;
-        fullConfig.get("input directory", inputDir);
-        oops::Log::info() << "Scanning directory: " << inputDir << std::endl;
-        inputFiles = getFilesFromDirectory(inputDir);
-        oops::Log::info() << "Found " << inputFiles.size() << " IODA files in directory" << std::endl;
-      } else if (fullConfig.has("input files")) {
-        fullConfig.get("input files", inputFiles);
-        oops::Log::info() << "Processing " << inputFiles.size() << " specified files" << std::endl;
-      } else {
-        throw eckit::Exception("Either 'input directory' or 'input files' must be specified");
+         std::string inputDir;
+         fullConfig.get("input directory", inputDir);
+         oops::Log::info() << "Scanning directory: " << inputDir << std::endl;
+         inputFiles = getFilesFromDirectory(inputDir);
+         oops::Log::info() << "Found " << inputFiles.size() << " IODA files in directory" << std::endl;
+      }  else if (fullConfig.has("input files")) {
+         fullConfig.get("input files", inputFiles);
+         oops::Log::info() << "Processing " << inputFiles.size() << " specified files" << std::endl;
+      }  else {
+         throw eckit::Exception("Either 'input directory' or 'input files' must be specified");
+      }
+    
+      // get "shared path" for mapping and query files
+      std::vector<std::string> sharedPath;
+      if (fullConfig.has("shared path")) {
+         fullConfig.get("shared path", sharedPath);
+         oops::Log::info() << "Shared Path: " << sharedPath << std::endl;
+      }  else {
+         throw std::runtime_error("Missing 'Shared Path' in YAML configuration");
       }
 
-      // get "variables", "count", and "channel" from yaml if it has
+      // get "variables" and "count" from yaml if it has
       std::vector<std::string> previewVars;
       size_t previewCount = 10;  // default if it doesn't have
-      size_t indexChannel = 0;   // default if it doesn't have
+      size_t indexChannel = 0;  // default if it doesn't have
 
       if (fullConfig.has("variables")) {
          fullConfig.get("variables", previewVars);
@@ -100,13 +109,13 @@ namespace dautils {
          for (const std::string& varName : previewVars) {
              oops::Log::info() << "  - " << varName << std::endl;
          }
-      } else {
+      }  else {
          oops::Log::info() << "No preview variables specified." << std::endl;
       }
 
       if (inputFiles.empty()) {
-        oops::Log::warning() << "No input files found to process" << std::endl;
-        return 0;
+         oops::Log::warning() << "No input files found to process" << std::endl;
+         return 0;
       }
 
       // get the communicator for just me
@@ -118,7 +127,7 @@ namespace dautils {
 
       std::vector<std::string> myFiles;
       for (size_t i = myrank; i < inputFiles.size(); i += nprocs) {
-        myFiles.push_back(inputFiles[i]);
+         myFiles.push_back(inputFiles[i]);
       }
 
       oops::Log::info() << "Process " << myrank << " will process " << myFiles.size() << " files" << std::endl;
@@ -126,22 +135,22 @@ namespace dautils {
       // process my files
       std::vector<FileInfo> fileInfos;
       for (const auto& file : myFiles) {
-        try {
-          FileInfo info = processFile(file, timeWindow, mycomm,
-                                      previewVars, previewCount, indexChannel);    
-          fileInfos.push_back(info);
-        } catch (const std::exception& e) {
-          oops::Log::warning() << "Failed to process file " << file << ": " << e.what() << std::endl;
-          // Add failed file info
-          FileInfo failedInfo;
-          failedInfo.filename = file;
-          failedInfo.nobs = 0;
-          failedInfo.nchans = 0;
-          failedInfo.nrecs = 0;
-          failedInfo.success = false;
-          failedInfo.errorMsg = e.what();
-          fileInfos.push_back(failedInfo);
-        }
+          try {
+             FileInfo info = processFile(file, timeWindow, mycomm,
+                                         previewVars, sharedPath, previewCount, indexChannel);    
+             fileInfos.push_back(info);
+          }  catch (const std::exception& e) {
+                oops::Log::warning() << "Failed to process file " << file << ": " << e.what() << std::endl;
+                // Add failed file info
+                FileInfo failedInfo;
+                failedInfo.filename = file;
+                failedInfo.nobs = 0;
+                failedInfo.nchans = 0;
+                failedInfo.nrecs = 0;
+                failedInfo.success = false;
+                failedInfo.errorMsg = e.what();
+                fileInfos.push_back(failedInfo);
+          }
       }
 
       // gather results from all processes
@@ -149,7 +158,7 @@ namespace dautils {
 
       // write output file (only from rank 0)
       if (myrank == 0) {
-        writeOutputFile(outputFile, allFileInfos, previewVars, previewCount, indexChannel);
+         writeOutputFile(outputFile, allFileInfos, previewVars, previewCount, indexChannel);
       }
 
       return 0;
@@ -226,7 +235,7 @@ namespace dautils {
           size_t dotPos = filename.find_last_of('.');
           if (dotPos != std::string::npos) {
             std::string ext = filename.substr(dotPos);
-            if (ext == ".nc" || ext == ".nc4" || ext == ".h5" || ext == ".hdf5" || ext == ".odb") {
+            if (ext == ".nc" || ext == ".nc4" || ext == ".h5" || ext == ".hdf5" || ext == ".odb" || ext == ".bufr") {
               files.push_back(fullPath);
             }
           }
@@ -242,8 +251,9 @@ namespace dautils {
                          const util::TimeWindow& timeWindow,
                          const eckit::mpi::Comm & comm,
                          const std::vector<std::string>& previewVars,   
+			 const std::vector<std::string>& sharedPath,
                          size_t previewCount,
-                         size_t indexChannel) const { 
+                         size_t indexChannel) const {                   
       FileInfo info;
       info.filename = filename;
       info.success = false;
@@ -252,17 +262,14 @@ namespace dautils {
         // create a minimal configuration for this file
         eckit::LocalConfiguration obsConfig;
 
-
         obsConfig.set("name", "ioda_dump_obsspace");
 
         std::string ext = filename.substr(filename.find_last_of('.')+1);
         std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);     // lowercase
 
-// Engine Type Selection based on the files
-
+        // Engine Type Selection based on the files
         if (ext == "nc" || ext == "nc4" || ext == "h5" || ext == "hdf5") {
            obsConfig.set("obsdatain.engine.type", "H5File");
-           obsConfig.set("obsdatain.engine.obsfile", filename);
 
         }  else if (ext == "odb") {
            obsConfig.set("obsdatain.obsfile", filename);
@@ -274,9 +281,11 @@ namespace dautils {
            // Extract instrument name from filename
            std::string base = filename.substr(0, filename.find_last_of('.'));
            std::string instrument = base.substr(base.find_last_of("/\\") + 1);
-           std::string queryFile = "/scratch3/NCEPDEV/da/Hyundeok.Choi/obsForge/sorc/ioda/share/ioda/yaml/iodatest_odb_" + instrument + ".yaml";
 
-           engineConfig.set("mapping file", "/scratch3/NCEPDEV/da/Hyundeok.Choi/obsForge/sorc/ioda/share/ioda/yaml/odb_default_name_map.yaml");
+           std::string yamlDir = sharedPath[0];
+           std::string queryFile = yamlDir + "/iodatest_odb_" + instrument + ".yaml";
+
+           engineConfig.set("mapping file", yamlDir + "/odb_default_name_map.yaml");
            engineConfig.set("query file", queryFile);
 
            // Attach the engine config under obsdatain
@@ -349,14 +358,11 @@ namespace dautils {
                    oss << kv.first << "(" << kv.second << ")";
                    satIDStrings.push_back(oss.str());
                 }
-
                 // Log to console
                 std::cout << "Unique satelliteIdentifier values found in " << filename << ":\n";
-
-		for (const auto& kv : satIDCounts) {
+                for (const auto& kv : satIDCounts) {
                    std::cout << "  " << kv.first << " (" << kv.second << ")\n";
                 }
-
                 info.previewData["MetaData/satelliteIdentifier_unique_sorted"] = satIDStrings;
             }
         } catch (const std::exception& e) {
@@ -379,7 +385,6 @@ namespace dautils {
               return oss.str();
            };
 
-
            for (const auto& id : uniqueSortedDate) {
                dateIDStrings.push_back(formatUnixTime(id));
            }
@@ -394,7 +399,6 @@ namespace dautils {
            } else {
               oops::Log::info() << "No valid dateTime entries found.\n";
            }
-
 
            info.previewData["MetaData/dateTime_unique_sorted"] = dateIDStrings;
         } catch (const std::exception& e) {
@@ -445,7 +449,7 @@ namespace dautils {
                    line << "  Loc[" << i << "]: " << obsData[i];
                    oops::Log::info() << line.str() << std::endl;       // Log it
                    dataLines.push_back(line.str()); // Store it
-                } else {                                      // --- 2D Case (with channels) ---
+                }  else {                                      // --- 2D Case (with channels) ---
                    std::stringstream line;
                    line << "  Loc[" << i << "]: ";
                    for (size_t j = 0; j < nchans; ++j) {
@@ -457,9 +461,7 @@ namespace dautils {
                 }
             }
             info.previewData[varName] = dataLines; // Add to the map
-
         }
-
       } catch (const std::exception& e) {
            info.errorMsg = e.what();
            oops::Log::warning() << "Error processing " << filename << ": " << e.what() << std::endl;
@@ -756,12 +758,12 @@ namespace dautils {
 
           // print out metaData variables w/ size
           if (!info.metaDataVars.empty()) {
-            outFile << "MetaData variables (" << info.metaDataVars.size() << "):\n";
-            for (size_t i = 0; i < info.metaDataVars.size(); ++i) {
-              outFile << "  " << (i + 1) << ". " << info.metaDataVars[i] << "\n";
-            }
-          } else {
-            outFile << "MetaData variables: None detected\n";
+             outFile << "MetaData variables (" << info.metaDataVars.size() << "):\n";
+             for (size_t i = 0; i < info.metaDataVars.size(); ++i) {
+                outFile << "  " << (i + 1) << ". " << info.metaDataVars[i] << "\n";
+             }
+          }  else {
+             outFile << "MetaData variables: None detected\n";
           }
 
           if (!info.obsValueVars.empty()) {
@@ -775,7 +777,7 @@ namespace dautils {
 
           // table view
           outFile << "Preview Data (" << previewCount << "):\n";
-          const int colWidth = 20;
+          const int colWidth = 24;
 
           if (!info.previewData.empty()) {
              // Extract variable names from previewData
@@ -838,21 +840,18 @@ namespace dautils {
                     }
 
 
-                    // Choose which channel to print by indexChannel (default: first channel)
-                    if (indexChannel < static_cast<int>(channels.size())) {
+                    // Choose which channel to print (default: first channel)
+                    if (indexChannel < channels.size()) {
                        outFile << std::setw(colWidth) << std::left << channels[indexChannel];
                     } else {
                        outFile << std::setw(colWidth) << std::left << "";  // empty if not available
                     }
-  
                 }
                 outFile << "\n";
              }
           } else {
              outFile << "  No preview data stored.\n";
           }
-
-
 
         } else {
           outFile << "Status: FAILED\n";

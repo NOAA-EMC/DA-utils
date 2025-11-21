@@ -33,7 +33,7 @@
 #include "oops/util/TimeWindow.h"
 
 namespace dautils {
-  // This utility reads IODA files and dumps basic summary information
+  // This utility reads IODA files and provides basic summary information
   // to a formatted ASCII text file. It supports:
   // - MPI execution
   // - Processing directories or lists of IODA files
