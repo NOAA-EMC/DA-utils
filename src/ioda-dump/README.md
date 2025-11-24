@@ -82,6 +82,10 @@ input files:
   - /data/ioda/sst/file2.h5
   - /data/ioda/sst/file3.nc4
 
+# Option for preview
+variables: ["MetaData/latitude", "MetaData/longitude", "ObsValue/brightnessTemperature"
+count: 10    # number of raws
+channel:0    #should be (nobs-1)
 # Output summary path (parent directory must exist)
 output file: /work/ioda_summary.txt
 ```

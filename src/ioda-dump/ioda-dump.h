@@ -71,10 +71,10 @@ namespace dautils {
          oops::Log::info() << "Scanning directory: " << inputDir << std::endl;
          inputFiles = getFilesFromDirectory(inputDir);
          oops::Log::info() << "Found " << inputFiles.size() << " IODA files in directory" << std::endl;
-      }  else if (fullConfig.has("input files")) {
+      } else if (fullConfig.has("input files")) {
          fullConfig.get("input files", inputFiles);
          oops::Log::info() << "Processing " << inputFiles.size() << " specified files" << std::endl;
-      }  else {
+      } else {
          throw eckit::Exception("Either 'input directory' or 'input files' must be specified");
       }
     
@@ -83,8 +83,9 @@ namespace dautils {
       if (fullConfig.has("shared path")) {
          fullConfig.get("shared path", sharedPath);
          oops::Log::info() << "Shared Path: " << sharedPath << std::endl;
-      }  else {
-         throw std::runtime_error("Missing 'Shared Path' in YAML configuration");
+      } else {
+         //throw std::runtime_error("Missing 'Shared Path' in YAML configuration");
+	 throw eckit::Exception("Missing 'Shared Path' in YAML configuration");
       }
 
       // get "variables" and "count" from yaml if it has
@@ -109,7 +110,7 @@ namespace dautils {
          for (const std::string& varName : previewVars) {
              oops::Log::info() << "  - " << varName << std::endl;
          }
-      }  else {
+      } else {
          oops::Log::info() << "No preview variables specified." << std::endl;
       }
 
@@ -139,7 +140,7 @@ namespace dautils {
              FileInfo info = processFile(file, timeWindow, mycomm,
                                          previewVars, sharedPath, previewCount, indexChannel);    
              fileInfos.push_back(info);
-          }  catch (const std::exception& e) {
+          } catch (const std::exception& e) {
                 oops::Log::warning() << "Failed to process file " << file << ": " << e.what() << std::endl;
                 // Add failed file info
                 FileInfo failedInfo;
@@ -251,7 +252,7 @@ namespace dautils {
                          const util::TimeWindow& timeWindow,
                          const eckit::mpi::Comm & comm,
                          const std::vector<std::string>& previewVars,   
-			 const std::vector<std::string>& sharedPath,
+                         const std::vector<std::string>& sharedPath,
                          size_t previewCount,
                          size_t indexChannel) const {                   
       FileInfo info;
@@ -264,14 +265,22 @@ namespace dautils {
 
         obsConfig.set("name", "ioda_dump_obsspace");
 
-        std::string ext = filename.substr(filename.find_last_of('.')+1);
+        //std::string ext = filename.substr(filename.find_last_of('.')+1);
+        std::string ext;
+        size_t dotPos = filename.find_last_of('.');
+        if (dotPos != std::string::npos && dotPos + 1 < filename.size()) {
+           ext = filename.substr(dotPos + 1);   // Extract extension safely
+        } else {
+          ext = "";  // or assign a default like "unknown"   // No dot found → fallback behavior
+        }
+
         std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);     // lowercase
 
         // Engine Type Selection based on the files
         if (ext == "nc" || ext == "nc4" || ext == "h5" || ext == "hdf5") {
            obsConfig.set("obsdatain.engine.type", "H5File");
 
-        }  else if (ext == "odb") {
+        } else if (ext == "odb") {
            obsConfig.set("obsdatain.obsfile", filename);
 
            // Create a nested configuration for the engine
@@ -281,6 +290,11 @@ namespace dautils {
            // Extract instrument name from filename
            std::string base = filename.substr(0, filename.find_last_of('.'));
            std::string instrument = base.substr(base.find_last_of("/\\") + 1);
+
+	   if (sharedPath.empty()) {
+              oops::Log::error() << "No shared path available for file " << filename << std::endl;
+              throw eckit::Exception("Shared path not available");
+           }
 
            std::string yamlDir = sharedPath[0];
            std::string queryFile = yamlDir + "/iodatest_odb_" + instrument + ".yaml";
@@ -294,10 +308,10 @@ namespace dautils {
            oops::Log::info() << "IODA-Dump: Engine type = ODB" << std::endl;
            oops::Log::info() << "IODA-Dump: Using query file: " << queryFile << std::endl;
 
-        }  else if (ext == "bufr") {
+        } else if (ext == "bufr") {
            obsConfig.set("obsdatain.engine.type", "BUFRFile");
-        }  else {
-           throw std::runtime_error("Unsupported file extension: " + ext);
+        } else {
+	   throw eckit::Exception("Unsupported file extension: " + ext);
         }
 
         obsConfig.set("obsdatain.engine.obsfile", filename);
@@ -449,7 +463,7 @@ namespace dautils {
                    line << "  Loc[" << i << "]: " << obsData[i];
                    oops::Log::info() << line.str() << std::endl;       // Log it
                    dataLines.push_back(line.str()); // Store it
-                }  else {                                      // --- 2D Case (with channels) ---
+                } else {                                      // --- 2D Case (with channels) ---
                    std::stringstream line;
                    line << "  Loc[" << i << "]: ";
                    for (size_t j = 0; j < nchans; ++j) {
@@ -762,7 +776,7 @@ namespace dautils {
              for (size_t i = 0; i < info.metaDataVars.size(); ++i) {
                 outFile << "  " << (i + 1) << ". " << info.metaDataVars[i] << "\n";
              }
-          }  else {
+          } else {
              outFile << "MetaData variables: None detected\n";
           }
 
@@ -777,7 +791,8 @@ namespace dautils {
 
           // table view
           outFile << "Preview Data (" << previewCount << "):\n";
-          const int colWidth = 24;
+          //const int colWidth = 24;
+          constexpr int COLUMN_WIDTH = 24;
 
           if (!info.previewData.empty()) {
              // Extract variable names from previewData
@@ -790,13 +805,13 @@ namespace dautils {
                 if (fullName == "MetaData/satelliteIdentifier_unique_sorted" ||
                     fullName ==  "MetaData/dateTime_unique_sorted") continue;
 
-                // Strip channel suffix if present
+		// Strip channel suffix if present
+                const std::string channelPrefix = "@channel_";
                 std::string baseName = fullName;
-                size_t atPos = fullName.find("@channel_");
+                size_t atPos = fullName.find(channelPrefix);
                 if (atPos != std::string::npos) {
-                    baseName = fullName.substr(0, atPos);
-                    std::string indexChannel = fullName.substr(atPos + 9);  // after "@channel_"
-                    if (indexChannel != "0") continue;  // skip non-zero channels
+                   baseName = fullName.substr(0, atPos);
+                   std::string indexChannel = fullName.substr(atPos + channelPrefix.size());
                 }
 
                 // Avoid duplicates
@@ -812,11 +827,22 @@ namespace dautils {
                 nrows = std::min(nrows, info.previewData.at(key).size());
              }
 
+	     // Build a map of column widths based on variable names
+             std::map<std::string, int> colWidths;
+             for (const auto& key : keys) {
+                size_t slash = key.find('/');
+                std::string label = (slash != std::string::npos) ? key.substr(slash + 1) : key;
+
+                // width = length of label + 4 (padding)
+                colWidths[key] = static_cast<int>(label.size()) + 4;
+             }
+
              // Print header (strip group prefix like MetaData/)
              for (const auto& key : keys) {
                 size_t slash = key.find('/');
                 std::string label = (slash != std::string::npos) ? key.substr(slash + 1) : key;
-                outFile << std::setw(colWidth) << std::left << label;
+                //outFile << std::setw(colWidth) << std::left << label;
+		outFile << std::setw(colWidths[key]) << std::left << label;
              }
              outFile << "\n";
 
@@ -839,12 +865,11 @@ namespace dautils {
                            channels.push_back(token);
                     }
 
-
                     // Choose which channel to print (default: first channel)
                     if (indexChannel < channels.size()) {
-                       outFile << std::setw(colWidth) << std::left << channels[indexChannel];
+                       outFile << std::setw(colWidths[key]) << std::left << channels[indexChannel];
                     } else {
-                       outFile << std::setw(colWidth) << std::left << "";  // empty if not available
+                       outFile << std::setw(colWidths[key]) << std::left << "";  // empty if not available
                     }
                 }
                 outFile << "\n";
