@@ -335,9 +335,9 @@ namespace dautils {
         std::vector<std::string> allVars = ospace.listVariables();
 
         // list Variables
-        std::cout << "Variables in ospace:" << std::endl;
+        oops::Log::info() << "Variables in ospace:" << std::endl;
         for (const auto& var : allVars) {
-           std::cout << "  " << var << std::endl;
+           oops::Log::info() << "  " << var << std::endl;
         }
 
         // Identify MetaData/ObsValue variables by convention (those that start with "MetaData/ObsValue")
@@ -373,9 +373,9 @@ namespace dautils {
                    satIDStrings.push_back(oss.str());
                 }
                 // Log to console
-                std::cout << "Unique satelliteIdentifier values found in " << filename << ":\n";
+                oops::Log::info() << "Unique satelliteIdentifier values found in " << filename << ":\n";
                 for (const auto& kv : satIDCounts) {
-                   std::cout << "  " << kv.first << " (" << kv.second << ")\n";
+                   oops::Log::info() << "  " << kv.first << " (" << kv.second << ")\n";
                 }
                 info.previewData["MetaData/satelliteIdentifier_unique_sorted"] = satIDStrings;
             }
@@ -897,4 +897,3 @@ namespace dautils {
   };
 
 }  // namespace dautils
-
