@@ -45,7 +45,7 @@ void dautils::CalcIodaStats::run() {
 
     // get the list of obs spaces to process
     std::vector<eckit::LocalConfiguration> obsSpaces;
-    config_.get("obs spaces", obsSpaces);
+    config_.get("observers", obsSpaces);
 
     // get the communicator for just me
     const eckit::mpi::Comm & mycomm = oops::mpi::myself();
@@ -233,6 +233,7 @@ void dautils::CalcIodaStats::run() {
 
         // initialize ASCII output for writing
         std::string outasciifile = obsSpaceName + "_ioda_stats.txt";
+        obsSpace.get("output text file", outasciifile);
         if (obsSpace.has("output ascii file")) {
             obsSpace.get("output ascii file", outasciifile);
         }
