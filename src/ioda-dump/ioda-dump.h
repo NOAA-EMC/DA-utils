@@ -84,14 +84,23 @@ namespace dautils {
          fullConfig.get("shared path", sharedPath);
          oops::Log::info() << "Shared Path: " << sharedPath << std::endl;
       } else {
-         //throw std::runtime_error("Missing 'Shared Path' in YAML configuration");
 	 throw eckit::Exception("Missing 'Shared Path' in YAML configuration");
+      }
+
+      // get "query prefix" for mapping and query files
+      std::vector<std::string> queryPrefix;
+      if (fullConfig.has("query prefix")) {
+         fullConfig.get("query prefix", queryPrefix);
+         oops::Log::info() << "Query Prefix: " << queryPrefix << std::endl;
+      } else {
+         throw eckit::Exception("Missing 'Query Prefix' in YAML configuration");
       }
 
       // get "variables" and "count" from yaml if it has
       std::vector<std::string> previewVars;
+      std::vector<std::string> channels;
       size_t previewCount = 10;  // default if it doesn't have
-      size_t indexChannel = 0;  // default if it doesn't have
+      size_t indexChannel = 1;   // default if it doesn't have. first channel (0-based) 
 
       if (fullConfig.has("variables")) {
          fullConfig.get("variables", previewVars);
@@ -128,7 +137,7 @@ namespace dautils {
 
       std::vector<std::string> myFiles;
       for (size_t i = myrank; i < inputFiles.size(); i += nprocs) {
-         myFiles.push_back(inputFiles[i]);
+          myFiles.push_back(inputFiles[i]);
       }
 
       oops::Log::info() << "Process " << myrank << " will process " << myFiles.size() << " files" << std::endl;
@@ -136,11 +145,11 @@ namespace dautils {
       // process my files
       std::vector<FileInfo> fileInfos;
       for (const auto& file : myFiles) {
-          try {
+         try {
              FileInfo info = processFile(file, timeWindow, mycomm,
-                                         previewVars, sharedPath, previewCount, indexChannel);    
+                                         previewVars, channels, sharedPath, queryPrefix, previewCount, indexChannel);    
              fileInfos.push_back(info);
-          } catch (const std::exception& e) {
+         } catch (const std::exception& e) {
                 oops::Log::warning() << "Failed to process file " << file << ": " << e.what() << std::endl;
                 // Add failed file info
                 FileInfo failedInfo;
@@ -151,17 +160,15 @@ namespace dautils {
                 failedInfo.success = false;
                 failedInfo.errorMsg = e.what();
                 fileInfos.push_back(failedInfo);
-          }
+         }
       }
 
       // gather results from all processes
       std::vector<FileInfo> allFileInfos = gatherResults(fileInfos);
 
-      // write output file (only from rank 0)
       if (myrank == 0) {
-         writeOutputFile(outputFile, allFileInfos, previewVars, previewCount, indexChannel);
+         writeOutputFile(outputFile, allFileInfos, previewVars, channels, previewCount, indexChannel);
       }
-
       return 0;
     }
 
@@ -174,6 +181,9 @@ namespace dautils {
       std::vector<std::string> metaDataVars;
       std::vector<std::string> obsValueVars;
       std::map<std::string, std::vector<std::string>> previewData;
+      std::string chosenKey;
+      std::map<std::string, std::vector<std::string>> identification;
+      std::map<std::string, std::vector<std::string>> idCounts; 
       bool success;
       std::string errorMsg;
     };
@@ -194,19 +204,19 @@ namespace dautils {
     void validateConfiguration(const eckit::Configuration & fullConfig) const {
       // Check for required fields
       if (!fullConfig.has("time window")) {
-        throw eckit::Exception("Configuration must include 'time window' section");
+         throw eckit::Exception("Configuration must include 'time window' section");
       }
 
       if (!fullConfig.has("output file")) {
-        throw eckit::Exception("Configuration must include 'output file' specification");
+         throw eckit::Exception("Configuration must include 'output file' specification");
       }
 
       if (!fullConfig.has("input directory") && !fullConfig.has("input files")) {
-        throw eckit::Exception("Configuration must include either 'input directory' or 'input files'");
+         throw eckit::Exception("Configuration must include either 'input directory' or 'input files'");
       }
 
       if (fullConfig.has("input directory") && fullConfig.has("input files")) {
-        oops::Log::warning() << "Both 'input directory' and 'input files' specified - using 'input directory'" << std::endl;
+         oops::Log::warning() << "Both 'input directory' and 'input files' specified - using 'input directory'" << std::endl;
       }
     }
 
@@ -220,26 +230,26 @@ namespace dautils {
 
       struct dirent* entry;
       while ((entry = readdir(dirp)) != nullptr) {
-        std::string filename = entry->d_name;
+         std::string filename = entry->d_name;
 
-        // Skip . and .. entries
-        if (filename == "." || filename == "..") {
-          continue;
-        }
+         // Skip . and .. entries
+         if (filename == "." || filename == "..") {
+            continue;
+         }
 
         std::string fullPath = dir + "/" + filename;
 
         // Check if it's a regular file
         struct stat fileStat;
         if (stat(fullPath.c_str(), &fileStat) == 0 && S_ISREG(fileStat.st_mode)) {
-          // Only include files that look like IODA files (nc, h5, hdf5)
-          size_t dotPos = filename.find_last_of('.');
-          if (dotPos != std::string::npos) {
-            std::string ext = filename.substr(dotPos);
-            if (ext == ".nc" || ext == ".nc4" || ext == ".h5" || ext == ".hdf5" || ext == ".odb" || ext == ".bufr") {
-              files.push_back(fullPath);
-            }
-          }
+           // Only include files that look like IODA files (nc, h5, hdf5)
+           size_t dotPos = filename.find_last_of('.');
+           if (dotPos != std::string::npos) {
+              std::string ext = filename.substr(dotPos);
+              if (ext == ".nc" || ext == ".nc4" || ext == ".h5" || ext == ".hdf5" || ext == ".odb" || ext == ".bufr") {
+                 files.push_back(fullPath);
+              }
+           }
         }
       }
 
@@ -251,8 +261,10 @@ namespace dautils {
     FileInfo processFile(const std::string& filename,
                          const util::TimeWindow& timeWindow,
                          const eckit::mpi::Comm & comm,
-                         const std::vector<std::string>& previewVars,   
+                         const std::vector<std::string>& previewVars,
+		         const std::vector<std::string>& channels,
                          const std::vector<std::string>& sharedPath,
+			 const std::vector<std::string>& queryPrefix,
                          size_t previewCount,
                          size_t indexChannel) const {                   
       FileInfo info;
@@ -297,7 +309,11 @@ namespace dautils {
            }
 
            std::string yamlDir = sharedPath[0];
-           std::string queryFile = yamlDir + "/iodatest_odb_" + instrument + ".yaml";
+	   std::string queryFile;
+	   if (queryPrefix.empty()) {
+              throw eckit::Exception("Query Prefix not available");
+           } 
+           queryFile = yamlDir + "/" + queryPrefix[0] + instrument + ".yaml";
 
            engineConfig.set("mapping file", yamlDir + "/odb_default_name_map.yaml");
            engineConfig.set("query file", queryFile);
@@ -335,7 +351,7 @@ namespace dautils {
         std::vector<std::string> allVars = ospace.listVariables();
 
         // list Variables
-        oops::Log::info() << "Variables in ospace:" << std::endl;
+        oops::Log::info() << "Variables in obs space:" << std::endl;
         for (const auto& var : allVars) {
            oops::Log::info() << "  " << var << std::endl;
         }
@@ -353,70 +369,82 @@ namespace dautils {
         oops::Log::info() << filename << ": Found " << info.metaDataVars.size() << " MetaData variables" << std::endl;
         oops::Log::info() << filename << ": Found " << info.obsValueVars.size() << " ObsValue variables" << std::endl;
         info.success = true;
+	
+        // all possible identification idKeys
+        std::vector<std::string> idKeys = {
+             "satelliteIdentifier",
+             "stationIdentification",
+             "buoy_identifier",
+             "wmo_station_number"
+        };
 
-        // Step 1: Extract MetaData/satelliteIdentifier
-        std::vector<int> satIDs(info.nobs);
-        std::map<int, size_t> satIDCounts;   // satID -> count
-        std::vector<std::string> satIDStrings;
-        try {
-            if (ospace.has("MetaData", "satelliteIdentifier")) {
-                ospace.get_db("MetaData", "satelliteIdentifier", satIDs);
+        std::string chosenKey;
+        std::vector<std::string> chosenValues;
 
-                // Count occurrences of each satID
-                for (const auto& id : satIDs) {
-                   satIDCounts[id]++;
-                }
-                // Prepare strings for previewData
-                for (const auto& kv : satIDCounts) {
-                   std::ostringstream oss;
-                   oss << kv.first << "(" << kv.second << ")";
-                   satIDStrings.push_back(oss.str());
-                }
-                // Log to console
-                oops::Log::info() << "Unique satelliteIdentifier values found in " << filename << ":\n";
-                for (const auto& kv : satIDCounts) {
-                   oops::Log::info() << "  " << kv.first << " (" << kv.second << ")\n";
-                }
-                info.previewData["MetaData/satelliteIdentifier_unique_sorted"] = satIDStrings;
-            }
-        } catch (const std::exception& e) {
-        oops::Log::warning() << "Could not read MetaData/satelliteIdentifier: " << e.what() << std::endl;
+        for (const auto & key : idKeys) {
+           try {
+              // First try integers
+              std::vector<int> intVals;
+              ospace.get_db("MetaData", key, intVals);
+              if (!intVals.empty()) {
+                 chosenKey = key;
+                 for (int v : intVals) chosenValues.push_back(std::to_string(v));
+                 break;
+              }
+           } catch (...) {}
+           try {
+              // Then try strings
+              std::vector<std::string> strVals;
+              ospace.get_db("MetaData", key, strVals);
+              if (!strVals.empty()) {
+                 chosenKey = key;
+                 chosenValues = strVals;
+                 break;  // stop at the first valid key
+              }
+           } catch (...) {}
+        }
+
+        if (!chosenKey.empty()) {
+           std::map<std::string,int> idCounts;
+           for (const auto & v : chosenValues) idCounts[v]++;
+           // Deduplicate and sort
+           std::set<std::string> uniqueSorted(chosenValues.begin(), chosenValues.end());
+           std::vector<std::string> ids, counts;
+           for (const auto & v : uniqueSorted) {
+              ids.push_back(v);
+              counts.push_back(std::to_string(idCounts[v]));
+           }
+	   info.chosenKey = chosenKey; 
+           info.identification["MetaData/Identification"] = ids;
+           info.idCounts["MetaData/Identification_Counts"] = counts;
+
+           oops::Log::info() << "Identification key chosen: " << chosenKey << "\n";
+           for (const auto & v : uniqueSorted) {
+              oops::Log::info() << "Identification " << v << " : " << idCounts[v] << " observations\n";
+           }
         }
 
         // Extract MetaData/dateTime
-        std::vector<int> dateIDs(info.nobs);
+        std::vector<util::DateTime> dateIDs(info.nobs);
         try {
+           // Only works if get_db can fill DateTime objects directly
            ospace.get_db("MetaData", "dateTime", dateIDs);
-           std::set<int> uniqueSortedDate(dateIDs.begin(), dateIDs.end());
+
+           std::set<util::DateTime> uniqueSortedDate(dateIDs.begin(), dateIDs.end());
            std::vector<std::string> dateIDStrings;
 
-           // Convert each timestamp to formatted UTC string
-           auto formatUnixTime = [](int timestamp) -> std::string {
-              std::time_t t = static_cast<std::time_t>(timestamp);
-              std::tm tm = *std::gmtime(&t);  // Convert to UTC
-              std::ostringstream oss;
-              oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S UTC");
-              return oss.str();
-           };
-
-           for (const auto& id : uniqueSortedDate) {
-               dateIDStrings.push_back(formatUnixTime(id));
+           for (const auto& dt : uniqueSortedDate) {
+              dateIDStrings.push_back(dt.toString());  // ISO 8601 UTC string
            }
 
-           //Store formatted dateTime strings for later output
            info.previewData["MetaData/dateTime_unique_sorted"] = dateIDStrings;
-
-           // Log to console
            if (!dateIDStrings.empty()) {
               oops::Log::info() << "Start dateTime: " << dateIDStrings.front() << "\n";
               oops::Log::info() << "End dateTime:   " << dateIDStrings.back() << "\n";
-           } else {
-              oops::Log::info() << "No valid dateTime entries found.\n";
            }
-
-           info.previewData["MetaData/dateTime_unique_sorted"] = dateIDStrings;
-        } catch (const std::exception& e) {
-        oops::Log::warning() << "Could not read MetaData/dateTime: " << e.what() << std::endl;
+        }
+        catch (const std::exception& e) {
+           oops::Log::warning() << "Could not read MetaData/dateTime: " << e.what() << std::endl;
         }
 
         // Assume the data is of type 'float'
@@ -479,9 +507,8 @@ namespace dautils {
       } catch (const std::exception& e) {
            info.errorMsg = e.what();
            oops::Log::warning() << "Error processing " << filename << ": " << e.what() << std::endl;
-        }
-
-        return info;
+      }
+      return info;
     }
 
     std::vector<FileInfo> gatherResults(const std::vector<FileInfo>& myResults) const {
@@ -609,10 +636,8 @@ namespace dautils {
                      reinterpret_cast<const char*>(&errorLen) + sizeof(size_t));
         buffer.insert(buffer.end(), info.errorMsg.begin(), info.errorMsg.end());
       }
-
       return buffer;
     }
-
 
     std::vector<FileInfo> deserializeFileInfos(const std::vector<char>& buffer) const {
       std::vector<FileInfo> infos;
@@ -715,6 +740,7 @@ namespace dautils {
     void writeOutputFile(const std::string& filename,
                          const std::vector<FileInfo>& fileInfos,
                          const std::vector<std::string>& previewVars,
+			 std::vector<std::string>& channels,
                          size_t previewCount,
                          size_t indexChannel) const {
       std::ofstream outFile(filename);
@@ -743,32 +769,40 @@ namespace dautils {
         outFile << "Full path: " << info.filename << "\n";
 
         if (info.success) {
-          outFile << "Status: SUCCESS\n";
+           outFile << "Status: SUCCESS\n";
+	  
+           // print start and end date/Time
+           if (info.previewData.find("MetaData/dateTime_unique_sorted") != info.previewData.end()) {
+              const std::vector<std::string>& dateIDStrings = info.previewData.at("MetaData/dateTime_unique_sorted");
 
-          auto satIt = info.previewData.find("MetaData/satelliteIdentifier_unique_sorted");
-          if (satIt != info.previewData.end()) {
-             outFile << "MetaData/satelliteIdentifier:\n";
-             for (const std::string& line : satIt->second) {
-                outFile << "    " << line << "\n";
-             }
-          }
-
-          // print start and end date/Time
-          if (info.previewData.find("MetaData/dateTime_unique_sorted") != info.previewData.end()) {
-             const std::vector<std::string>& dateIDStrings = info.previewData.at("MetaData/dateTime_unique_sorted");
-
-             if (!dateIDStrings.empty()) {
-                outFile << "DateTime Range:\n";
-                outFile << "  Start: " << dateIDStrings.front() << "\n";
-                outFile << "  End:   " << dateIDStrings.back() << "\n";
-             } else {
+              if (!dateIDStrings.empty()) {
+                 outFile << "DateTime Range:\n";
+                 outFile << "  Start: " << dateIDStrings.front() << "\n";
+                 outFile << "  End:   " << dateIDStrings.back() << "\n";
+              } else {
                 outFile << "No valid dateTime entries found.\n";
-             }
-          }
+              }
+           }
 
-          outFile << "Number of observations (nobs): " << info.nobs << "\n";
-          outFile << "Number of records (nrecs): " << info.nrecs << "\n";
-          outFile << "Number of channels (nchans): " << info.nchans << "\n";
+           outFile << "Number of observations (nobs): " << info.nobs << "\n";
+           outFile << "Number of records (nrecs): " << info.nrecs << "\n";
+           outFile << "Number of channels (nchans): " << info.nchans << "\n";
+
+	   // print out Identifications (unique, sorted)
+           if (!info.chosenKey.empty() &&
+               info.identification.find("MetaData/Identification") != info.identification.end() &&
+               info.idCounts.find("MetaData/Identification_Counts") != info.idCounts.end()) {
+
+               const auto & ids = info.identification.at("MetaData/Identification");
+               const auto & counts = info.idCounts.at("MetaData/Identification_Counts");
+
+               outFile << "Identifications: " << info.chosenKey << "\n";
+               for (size_t i = 0; i < ids.size(); ++i) {
+                  outFile << "  " << ids[i] << " : " << counts[i] << " observations\n";
+               }
+           } else {
+              outFile << "Identifications: N/A\n";
+	   }
 
           // print out metaData variables w/ size
           if (!info.metaDataVars.empty()) {
@@ -789,7 +823,7 @@ namespace dautils {
             outFile << "ObsValue variables: None detected\n";
           }
 
-          // table view
+          // table preview data
           outFile << "Preview Data (" << previewCount << "):\n";
           //const int colWidth = 24;
           constexpr int COLUMN_WIDTH = 24;
@@ -811,7 +845,8 @@ namespace dautils {
                 size_t atPos = fullName.find(channelPrefix);
                 if (atPos != std::string::npos) {
                    baseName = fullName.substr(0, atPos);
-                   std::string indexChannel = fullName.substr(atPos + channelPrefix.size());
+		   std::string indexStr = fullName.substr(atPos + channelPrefix.size());
+		   indexChannel = std::stoul(indexStr);  // convert to integer
                 }
 
                 // Avoid duplicates
@@ -850,7 +885,6 @@ namespace dautils {
              for (size_t i = 0; i < nrows; ++i) {
                 for (const auto& key : keys) {
                     const std::vector<std::string>& values = info.previewData.at(key);
-
                     std::string val = (i < values.size()) ? values[i] : "";
 
                     // Trim any prefix like "float:" or "int:"
@@ -866,10 +900,10 @@ namespace dautils {
                     }
 
                     // Choose which channel to print (default: first channel)
-                    if (indexChannel < channels.size()) {
-                       outFile << std::setw(colWidths[key]) << std::left << channels[indexChannel];
+		    if (indexChannel > 0 && (indexChannel - 1) < channels.size()) {
+                       outFile << std::setw(colWidths[key]) << std::left << channels[indexChannel - 1];
                     } else {
-                       outFile << std::setw(colWidths[key]) << std::left << "";  // empty if not available
+                       outFile << std::setw(colWidths[key]) << std::left << "";
                     }
                 }
                 outFile << "\n";

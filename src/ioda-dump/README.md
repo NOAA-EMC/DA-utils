@@ -61,11 +61,23 @@ time window:
   # optional; include lower bound
   bound to include: begin
 
-# Scan a directory (non-recursive). Files with extensions .nc, .nc4, .h5, .hdf5 are included.
+# Scan a directory (non-recursive). Files with extensions .nc, .nc4, .h5, .hdf5, .odb are included.
 input directory: /path/to/ioda/files
 
+shared path: [/path/to/ioda/shared/yaml]
+query prefix: [iodatest_odb_]
+
+variables:
+  - MetaData/latitude
+  - MetaData/longitude
+  - ObsValue/brightnessTemperature
+  - ObsValue/seaSurfaceTemperature
+
+count: 10   # If comment out, default is "nobs" (up to 100 to avoid printing thousands of rows) .
+channel: 1  # should be  between 1 and number of channels
+
 # Output summary path (parent directory must exist)
-output file: /path/to/output/ioda_summary.txt
+output file: /path/to/output/ioda_dump.txt
 ```
 
 ### Example: explicit file list
@@ -81,13 +93,23 @@ input files:
   - /data/ioda/sst/file1.nc
   - /data/ioda/sst/file2.h5
   - /data/ioda/sst/file3.nc4
+  - /data/ioda/sst/file4.odb
+
+shared path: [/path/to/ioda/shared/yaml]
+query prefix: [iodatest_odb_]
 
 # Option for preview
-variables: ["MetaData/latitude", "MetaData/longitude", "ObsValue/brightnessTemperature"
-count: 10    # number of raws
-channel:0    #should be (nobs-1)
+variables:
+  - MetaData/latitude
+  - MetaData/longitude
+  - ObsValue/brightnessTemperature
+  - ObsValue/seaSurfaceTemperature
+ 
+count: 10    # number of data preview raws
+channel: 0   # should be  between 1 and number of channels
+
 # Output summary path (parent directory must exist)
-output file: /work/ioda_summary.txt
+output file: /work/ioda_dump.txt
 ```
 
 ## Output format
@@ -96,21 +118,51 @@ A single ASCII file is produced containing a header and one section per input fi
 
 ```
 ================================================================================
-                          IODA File Summary Report                             
+                          IODA File Dump Report                             
 ================================================================================
 Generated on: 2025-09-30T12:34:56Z
-Total files processed: 3
+Total files processed: 2
 ================================================================================
 
 File: file1.nc
 Full path: /path/to/ioda/file1.nc
 Status: SUCCESS
+DateTime Range:
+  Start: 2011-09-02 21:10:33 UTC
+  End:   2011-09-03 03:09:59 UTC
 Number of observations (nobs): 123456
 Number of records (nrecs): 123456
 Number of channels (nchans): 5
-ObsValue variables (2):
-  1. ObsValue/sst
-  2. ObsValue/sea_ice_fraction
+Identifications: satelliteIdentifier
+  1005 : 86 observations
+  262 : 175 observations
+  65 : 283 observations
+MetaData variables (11):
+  1. MetaData/dateTime
+  2. MetaData/dynamic_atmosphere_correction
+  3. MetaData/instrumentIdentifier
+  4. MetaData/latitude
+  5. MetaData/long_wave_error
+  6. MetaData/longitude
+  7. MetaData/observationTypeNum
+  8. MetaData/ocean_tide
+  9. MetaData/receiptdateTime
+  10. MetaData/satelliteIdentifier
+  11. MetaData/sequenceNumber
+ObsValue variables (1):
+  1. ObsValue/seaSurfaceHeightAnomaly
+Preview Data (10):
+latitude    longitude    seaSurfaceHeightAnomaly
+64.22       -29.98       -0.013
+64.24       -29.86       -0.014
+64.26       -29.74       -0.007
+64.29       -29.62       -0.001
+64.31       -29.5        -0.01
+64.33       -29.38       0.005
+64.35       -29.27       0.018
+64.37       -29.15       0.053
+64.39       -29.03       0.036
+64.41       -28.91       0.052
 --------------------------------------------------------------------------------
 ... (repeated per file)
 
