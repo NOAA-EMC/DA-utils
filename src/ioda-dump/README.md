@@ -74,7 +74,7 @@ variables:
   - ObsValue/seaSurfaceTemperature
 
 count: 10   # If comment out, default is "nobs" (up to 100 to avoid printing thousands of rows) .
-channel: 1  # should be  between 1 and number of channels
+channel: 1  # should be  between 1 and number of channels (nchans)
 
 # Output summary path (parent directory must exist)
 output file: /path/to/output/ioda_dump.txt
@@ -106,7 +106,7 @@ variables:
   - ObsValue/seaSurfaceTemperature
  
 count: 10    # number of data preview raws
-channel: 0   # should be  between 1 and number of channels
+channel: 1   # should be  between 1 and number of channels (nchans)
 
 # Output summary path (parent directory must exist)
 output file: /work/ioda_dump.txt
@@ -134,9 +134,9 @@ Number of observations (nobs): 123456
 Number of records (nrecs): 123456
 Number of channels (nchans): 5
 Identifications: satelliteIdentifier
-  1005 : 86 observations
-  262 : 175 observations
-  65 : 283 observations
+  1004 : 89 observations
+  8282 : 286 observations
+  EU23 : 5 observations
 MetaData variables (11):
   1. MetaData/dateTime
   2. MetaData/dynamic_atmosphere_correction
@@ -176,7 +176,7 @@ If a file fails to open or parse, the section shows `Status: FAILED` and the err
 ## Notes and limitations
 
 - MPI distribution: input files are divided round-robin across ranks, and results are automatically gathered to rank 0 for output.
-- Directory scanning is non-recursive and includes only regular files with extensions `.nc`, `.nc4`, `.h5`, `.hdf5`.
+- Directory scanning is non-recursive and includes only regular files with extensions `.nc`, `.nc4`, `.h5`, `.hdf5`, `.odb`.
 - Time window filtering is applied by `ioda::ObsSpace` if time metadata are present in the file.
 - Ensure the parent directory of `output file` exists; otherwise opening the output will fail.
 
