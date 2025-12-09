@@ -233,7 +233,6 @@ void dautils::CalcIodaStats::run() {
 
         // initialize ASCII output for writing
         std::string outasciifile = obsSpaceName + "_ioda_stats.txt";
-        obsSpace.get("output text file", outasciifile);
         if (obsSpace.has("output ascii file")) {
             obsSpace.get("output ascii file", outasciifile);
         }
