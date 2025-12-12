@@ -779,13 +779,13 @@ class Conv(BaseGSI):
         for v in self.obsvars:
             for p in platforms:
                 outname = OutDir + '/' + p + '_' + v + '_geoval_' + \
-                    self.validtime.strftime("%Y%m%d%H") + '.nc4'
+                    self.validtime.strftime("%Y%m%d%H") + '.nc'
                 if (v == 'sst'):
                     outname = OutDir + '/' + v + '_geoval_' + \
-                        self.validtime.strftime("%Y%m%d%H") + '.nc4'
+                        self.validtime.strftime("%Y%m%d%H") + '.nc'
                 if (p == 'windprof' or p == 'satwind' or p == 'scatwind' or p == 'vadwind' or p == 'pibal'):
                     outname = OutDir + '/' + p + '_geoval_' + \
-                        self.validtime.strftime("%Y%m%d%H") + '.nc4'
+                        self.validtime.strftime("%Y%m%d%H") + '.nc'
                 if not clobber:
                     if (os.path.exists(outname)):
                         print("File exists. Skipping and not overwriting:%s" % outname)
@@ -1265,7 +1265,7 @@ class Radiances(BaseGSI):
         # ioda_conv_ncio or equivalent to handle the format
         # set up output file
         outname = OutDir + '/' + self.sensor + '_' + self.satellite + \
-            '_geoval_' + self.validtime.strftime("%Y%m%d%H") + '.nc4'
+            '_geoval_' + self.validtime.strftime("%Y%m%d%H") + '.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting:")
@@ -1334,7 +1334,7 @@ class Radiances(BaseGSI):
 
         # set up output file
         outname = OutDir + '/' + self.sensor + '_' + self.satellite + \
-            '_obsdiag_' + self.validtime.strftime("%Y%m%d%H") + '.nc4'
+            '_obsdiag_' + self.validtime.strftime("%Y%m%d%H") + '.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
@@ -1823,7 +1823,7 @@ class Ozone(BaseGSI):
         # ioda_conv_ncio or equivalent to handle the format
 
         # set up output file
-        outname = OutDir+'/'+self.sensor+'_'+self.satellite+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc4'
+        outname = OutDir+'/'+self.sensor+'_'+self.satellite+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
@@ -2061,7 +2061,7 @@ class Radar(BaseGSI):
         # ioda_conv_ncio or equivalent to handle the format
 
         # set up output file
-        outname = OutDir+'/'+self.sensor+'_'+self.obstype+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc4'
+        outname = OutDir+'/'+self.sensor+'_'+self.obstype+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
