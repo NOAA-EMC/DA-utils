@@ -45,7 +45,7 @@ void dautils::CalcIodaStats::run() {
 
     // get the list of obs spaces to process
     std::vector<eckit::LocalConfiguration> obsSpaces;
-    config_.get("obs spaces", obsSpaces);
+    config_.get("observers", obsSpaces);
 
     // get the communicator for just me
     const eckit::mpi::Comm & mycomm = oops::mpi::myself();
