@@ -42,7 +42,6 @@ endif()
 list( APPEND CMAKE_INSTALL_RPATH ${CMAKE_CURRENT_BINARY_DIR}/fv3 )
 
 # Handle user options
-option(BUILD_REGRID_STATES "Build regrid states land DA utility" ON)
 option(CLONE_JCSDA_REPOS "Enable this option to automatically fetch and build the OOPS and IODA repositories. This is useful for development or setting up a complete environment." OFF)
 
 # Initialize bundle
