@@ -920,7 +920,7 @@ class Conv(BaseGSI):
                         self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
                 if (p == 'gps'):
                     outname = OutDir + '/' + 'gnssro' + diagtype + \
-                    self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
+                        self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
                 if not clobber:
                     if (os.path.exists(outname)):
                         print("File exists. Skipping and not overwriting: %s" % outname)
