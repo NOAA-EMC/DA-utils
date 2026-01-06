@@ -1894,7 +1894,7 @@ class Ozone(BaseGSI):
         else:
             diagtype = "_obs_"
             varsuffix = ""
-        outname = OutDir+'/retrieval_ozone_'+self.sensor+'_'+self.satellite+diagtype+self.validtime.strftime("%Y%m%d%H")+'.gsi.nc'
+        outname = OutDir + '/retrieval_ozone_' + self.sensor + '_' + self.satellite + diagtype + self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
