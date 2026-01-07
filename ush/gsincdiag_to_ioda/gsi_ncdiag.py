@@ -911,13 +911,16 @@ class Conv(BaseGSI):
             for p in platforms:
                 # set up a NcWriter class
                 outname = OutDir + '/' + p + '_' + v + diagtype + \
-                    self.validtime.strftime("%Y%m%d%H") + '.nc'
+                    self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
                 if (v == 'sst'):
                     outname = OutDir + '/' + v + diagtype + \
-                        self.validtime.strftime("%Y%m%d%H") + '.nc'
+                        self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
                 if (p == 'windprof' or p == 'satwind' or p == 'scatwind' or p == 'vadwind' or p == 'pibal'):
                     outname = OutDir + '/' + p + diagtype + \
-                        self.validtime.strftime("%Y%m%d%H") + '.nc'
+                        self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
+                if (p == 'gps'):
+                    outname = OutDir + '/' + 'gnssro' + diagtype + \
+                        self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
                 if not clobber:
                     if (os.path.exists(outname)):
                         print("File exists. Skipping and not overwriting: %s" % outname)
@@ -1428,8 +1431,8 @@ class Radiances(BaseGSI):
         else:
             diagtype = "_obs_"
             varsuffix = ""
-        outname = OutDir + '/' + self.sensor + '_' + self.satellite + \
-            diagtype + self.validtime.strftime("%Y%m%d%H") + '.nc'
+        outname = OutDir + '/radiance_' + self.sensor + '_' + self.satellite + \
+            diagtype + self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
@@ -1891,7 +1894,7 @@ class Ozone(BaseGSI):
         else:
             diagtype = "_obs_"
             varsuffix = ""
-        outname = OutDir+'/'+self.sensor+'_'+self.satellite+diagtype+self.validtime.strftime("%Y%m%d%H")+'.nc'
+        outname = OutDir + '/retrieval_ozone_' + self.sensor + '_' + self.satellite + diagtype + self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
