@@ -1930,8 +1930,10 @@ class Ozone(BaseGSI):
         try:
             tmp = self.var('Input_Observation_Error')
         except IndexError:
-            # tmp = 1./self.var('Inverse_Observation_Error')
-            tmp = np.repeat(self.var('error_variance'), nlocs, axis=0)
+            try:
+                tmp = 1./self.var('Inverse_Observation_Error')
+            except IndexError:
+                tmp = np.repeat(self.var('error_variance'), nlocs, axis=0)
         tmp[tmp < self.EPSILON] = 0
         obserr = tmp
         obserr[np.isinf(obserr)] = self.FLOAT_FILL
