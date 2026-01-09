@@ -77,8 +77,8 @@ conv_bufrtypes = {
     "rass": [126],
     "sfcship": [180, 183],
     "sfc": [181, 187],
-    "gps": [3, 4, 5, 41, 42, 43, 44, 66, 265, 266, 267, 268, 269, 421, 440, \
-            722, 723, 740, 741, 742, 743, 744, 745, \
+    "gps": [3, 4, 5, 41, 42, 43, 44, 66, 265, 266, 267, 268, 269, 421, 440,
+            722, 723, 740, 741, 742, 743, 744, 745,
             750, 751, 752, 753, 754, 755, 786, 803, 804, 820, 821, 825],
     "sst": [181, 182, 183, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202],
     # 132 are dropsondes
@@ -732,7 +732,7 @@ class Conv(BaseGSI):
         self.globalAttrs = {
             'converter': os.path.basename(__file__),
         }
-        
+
         self.filename = filename
         splitfname = self.filename.split('/')[-1].split('_')
         if 'conv' in splitfname:
@@ -1232,7 +1232,7 @@ class Radiances(BaseGSI):
         self.globalAttrs = {
             'converter': os.path.basename(__file__),
         }
-        
+
         self.filename = filename
         splitfname = self.filename.split('/')[-1].split('_')
         i = False
@@ -1587,6 +1587,11 @@ class Radiances(BaseGSI):
                 # outdata[(loc_mdata_name, 'MetaData')] = tmp
                 # if loc_mdata_name in units_values.keys():
                 #     varAttrs[(loc_mdata_name, 'MetaData')]['units'] = units_values[loc_mdata_name]
+            elif self.sensor == "ssmis" and lvar == "Sat_Azimuth_Angle":
+                tmp = self.var(lvar)[::nchans].astype(np.int32)
+                tmp[tmp > 4e8] = self.INT_FILL
+                outdata[("satelliteAscendingFlag", 'MetaData')] = tmp
+                varAttrs[("satelliteAscendingFlag", 'MetaData')]['_FillValue'] = self.INT_FILL
             else:
                 if dtype == 'integer':
                     tmp = self.var(lvar)[::nchans].astype(np.int32)
@@ -1790,7 +1795,7 @@ class Ozone(BaseGSI):
         self.globalAttrs = {
             'converter': os.path.basename(__file__),
         }
-        
+
         self.filename = filename
         splitfname = self.filename.split('/')[-1].split('_')
         i = False
@@ -2034,7 +2039,7 @@ class Radar(BaseGSI):
         self.globalAttrs = {
             'converter': os.path.basename(__file__),
         }
-        
+
         self.filename = filename
         splitfname = self.filename.split('/')[-1].split('_')
         i = False
