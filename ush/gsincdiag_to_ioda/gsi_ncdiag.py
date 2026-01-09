@@ -1628,6 +1628,15 @@ class Radiances(BaseGSI):
             varAttrs[("cosineOfLatitudeTimesOrbitNode", "MetaData")]['units'] = 'unitless'
             varAttrs[("sineOfLatitude", "MetaData")]['units'] = 'unitless'
 
+            # Set sensorAzimuthAngle to missing
+            sensor_azimuth_angle = self.var('sensorAzimuthAngle')[::nchans] if 'sensorAzimuthAngle' in self.df.variables else None
+            if sensor_azimuth_angle is not None:
+                sensor_azimuth_angle[:] = self.FLOAT_FILL
+                outdata[("sensorAzimuthAngle", "MetaData")] = sensor_azimuth_angle
+                self.VarDims[("sensorAzimuthAngle", "MetaData")] = ["Location"]
+                varAttrs[("sensorAzimuthAngle", "MetaData")]['units'] = 'degree'
+                varAttrs[("sensorAzimuthAngle", "MetaData")]['_FillValue'] = self.FLOAT_FILL
+
         # put the TestReference fields in the structure for writing out
         for tvar in TestVars:
             if tvar in test_fields_with_channels_:
