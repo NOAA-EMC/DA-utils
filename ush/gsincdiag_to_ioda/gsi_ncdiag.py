@@ -1587,6 +1587,11 @@ class Radiances(BaseGSI):
                 # outdata[(loc_mdata_name, 'MetaData')] = tmp
                 # if loc_mdata_name in units_values.keys():
                 #     varAttrs[(loc_mdata_name, 'MetaData')]['units'] = units_values[loc_mdata_name]
+            elif self.sensor == "ssmis" and lvar == "Sat_Azimuth_Angle":
+                tmp = self.var(lvar)[::nchans].astype(np.int32)
+                tmp[tmp > 4e8] = self.INT_FILL
+                outdata[("satelliteAscendingFlag", 'MetaData')] = tmp
+                varAttrs[("satelliteAscendingFlag", 'MetaData')]['_FillValue'] = self.INT_FILL
             else:
                 if dtype == 'integer':
                     tmp = self.var(lvar)[::nchans].astype(np.int32)
@@ -1600,42 +1605,6 @@ class Radiances(BaseGSI):
 
                 if loc_mdata_name in units_values.keys():
                     varAttrs[(loc_mdata_name, 'MetaData')]['units'] = units_values[loc_mdata_name]
-
-        # Special treatment for SSMIS where the orbit node information is stored in the Sat_Azimuth_Angle field
-        if self.sensor == "ssmis":  # Check if the sensor is "ssmis"
-
-            # Compute cosineOfLatitudeTimesOrbitNode and sineOfLatitude
-            latitude = self.var('Latitude')[::nchans]  # Get latitude values
-            sat_orbit_node = self.var('Sat_Azimuth_Angle')[::nchans]  # Get satellite orbit node values
-
-            # Calculate the new fields
-            cosine_of_latitude_times_orbit_node = sat_orbit_node * np.cos(np.radians(latitude))
-            sine_of_latitude = np.sin(np.radians(latitude))
-
-            # Ensure fill values are applied for invalid data
-            cosine_of_latitude_times_orbit_node[np.abs(cosine_of_latitude_times_orbit_node) > 4e8] = self.FLOAT_FILL
-            sine_of_latitude[np.abs(sine_of_latitude) > 4e8] = self.FLOAT_FILL
-
-            # Add the new fields to MetaData
-            outdata[("cosineOfLatitudeTimesOrbitNode", "MetaData")] = cosine_of_latitude_times_orbit_node
-            outdata[("sineOfLatitude", "MetaData")] = sine_of_latitude
-
-            # Set variable dimensions
-            self.VarDims[("cosineOfLatitudeTimesOrbitNode", "MetaData")] = ["Location"]
-            self.VarDims[("sineOfLatitude", "MetaData")] = ["Location"]
-
-            # Assign units metadata if applicable
-            varAttrs[("cosineOfLatitudeTimesOrbitNode", "MetaData")]['units'] = 'unitless'
-            varAttrs[("sineOfLatitude", "MetaData")]['units'] = 'unitless'
-
-            # Set sensorAzimuthAngle to missing
-            sensor_azimuth_angle = self.var('sensorAzimuthAngle')[::nchans] if 'sensorAzimuthAngle' in self.df.variables else None
-            if sensor_azimuth_angle is not None:
-                sensor_azimuth_angle[:] = self.FLOAT_FILL
-                outdata[("sensorAzimuthAngle", "MetaData")] = sensor_azimuth_angle
-                self.VarDims[("sensorAzimuthAngle", "MetaData")] = ["Location"]
-                varAttrs[("sensorAzimuthAngle", "MetaData")]['units'] = 'degree'
-                varAttrs[("sensorAzimuthAngle", "MetaData")]['_FillValue'] = self.FLOAT_FILL
 
         # put the TestReference fields in the structure for writing out
         for tvar in TestVars:
