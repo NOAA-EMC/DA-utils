@@ -77,8 +77,8 @@ conv_bufrtypes = {
     "rass": [126],
     "sfcship": [180, 183],
     "sfc": [181, 187],
-    "gps": [3, 4, 5, 41, 42, 43, 44, 66, 265, 266, 267, 268, 269, 421, 440, \
-            722, 723, 740, 741, 742, 743, 744, 745, \
+    "gps": [3, 4, 5, 41, 42, 43, 44, 66, 265, 266, 267, 268, 269, 421, 440,
+            722, 723, 740, 741, 742, 743, 744, 745,
             750, 751, 752, 753, 754, 755, 786, 803, 804, 820, 821, 825],
     "sst": [181, 182, 183, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202],
     # 132 are dropsondes
@@ -732,7 +732,7 @@ class Conv(BaseGSI):
         self.globalAttrs = {
             'converter': os.path.basename(__file__),
         }
-        
+
         self.filename = filename
         splitfname = self.filename.split('/')[-1].split('_')
         if 'conv' in splitfname:
@@ -1232,7 +1232,7 @@ class Radiances(BaseGSI):
         self.globalAttrs = {
             'converter': os.path.basename(__file__),
         }
-        
+
         self.filename = filename
         splitfname = self.filename.split('/')[-1].split('_')
         i = False
@@ -1601,6 +1601,33 @@ class Radiances(BaseGSI):
                 if loc_mdata_name in units_values.keys():
                     varAttrs[(loc_mdata_name, 'MetaData')]['units'] = units_values[loc_mdata_name]
 
+        # Special treatment for SSMIS where the orbit node information is stored in the Sat_Azimuth_Angle field
+        if self.sensor == "ssmis":  # Check if the sensor is "ssmis"
+
+            # Compute cosineOfLatitudeTimesOrbitNode and sineOfLatitude
+            latitude = self.var('Latitude')[::nchans]  # Get latitude values
+            sat_orbit_node = self.var('Sat_Azimuth_Angle')[::nchans]  # Get satellite orbit node values
+
+            # Calculate the new fields
+            cosine_of_latitude_times_orbit_node = sat_orbit * np.cos(np.radians(latitude))
+            sine_of_latitude = np.sin(np.radians(latitude))
+
+            # Ensure fill values are applied for invalid data
+            cosine_of_latitude_times_orbit_node[np.abs(cosine_of_latitude_times_orbit_node) > 4e8] = self.FLOAT_FILL
+            sine_of_latitude[np.abs(sine_of_latitude_times_orbit_node) > 4e8] = self.FLOAT_FILL
+
+            # Add the new fields to MetaData
+            outdata[("cosineOfLatitudeTimesOrbitNode", "MetaData")] = cosine_of_latitude_times_orbit_node
+            outdata[("sineOfLatitude", "MetaData")] = sine_of_latitude
+
+            # Set variable dimensions
+            self.VarDims[("cosineOfLatitudeTimesOrbitNode", "MetaData")] = ["Location"]
+            self.VarDims[("sineOfLatitude", "MetaData")] = ["Location"]
+
+            # Assign units metadata if applicable
+            varAttrs[("cosineOfLatitudeTimesOrbitNode", "MetaData")]['units'] = 'unitless'
+            varAttrs[("sineOfLatitude", "MetaData")]['units'] = 'unitless'
+
         # put the TestReference fields in the structure for writing out
         for tvar in TestVars:
             if tvar in test_fields_with_channels_:
@@ -1790,7 +1817,7 @@ class Ozone(BaseGSI):
         self.globalAttrs = {
             'converter': os.path.basename(__file__),
         }
-        
+
         self.filename = filename
         splitfname = self.filename.split('/')[-1].split('_')
         i = False
@@ -2034,7 +2061,7 @@ class Radar(BaseGSI):
         self.globalAttrs = {
             'converter': os.path.basename(__file__),
         }
-        
+
         self.filename = filename
         splitfname = self.filename.split('/')[-1].split('_')
         i = False
