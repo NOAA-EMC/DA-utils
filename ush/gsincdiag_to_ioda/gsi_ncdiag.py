@@ -1614,7 +1614,7 @@ class Radiances(BaseGSI):
 
             # Ensure fill values are applied for invalid data
             cosine_of_latitude_times_orbit_node[np.abs(cosine_of_latitude_times_orbit_node) > 4e8] = self.FLOAT_FILL
-            sine_of_latitude[np.abs(sine_of_latitude_times_orbit_node) > 4e8] = self.FLOAT_FILL
+            sine_of_latitude[np.abs(sine_of_latitude) > 4e8] = self.FLOAT_FILL
 
             # Add the new fields to MetaData
             outdata[("cosineOfLatitudeTimesOrbitNode", "MetaData")] = cosine_of_latitude_times_orbit_node
