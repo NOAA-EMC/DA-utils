@@ -1609,7 +1609,7 @@ class Radiances(BaseGSI):
             sat_orbit_node = self.var('Sat_Azimuth_Angle')[::nchans]  # Get satellite orbit node values
 
             # Calculate the new fields
-            cosine_of_latitude_times_orbit_node = sat_orbit * np.cos(np.radians(latitude))
+            cosine_of_latitude_times_orbit_node = sat_orbit_node * np.cos(np.radians(latitude))
             sine_of_latitude = np.sin(np.radians(latitude))
 
             # Ensure fill values are applied for invalid data
