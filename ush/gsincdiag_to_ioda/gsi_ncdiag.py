@@ -1972,6 +1972,7 @@ class Ozone(BaseGSI):
                 outdata[('pressureVertice', 'RetrievalAncillaryData')] = pressure_vertices
                 self.VarDims[('pressureVertice', 'RetrievalAncillaryData')] = ['Location', 'Vertices']
                 varAttrs[('pressureVertice', 'RetrievalAncillaryData')]['units'] = 'Pa'
+                varAttrs[('pressureVertice', 'RetrievalAncillaryData')]['_FillValue'] = self.FLOAT_FILL
                 # Add Vertices dimension to DimDict
                 self.DimDict['Vertices'] = 2
 
