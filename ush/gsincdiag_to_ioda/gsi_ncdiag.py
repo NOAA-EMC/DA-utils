@@ -516,7 +516,7 @@ oz_lay_sensors = [
     'sbuv2',
     'omi',
     'ompsnp',
-    'ompstc',
+    'ompstc8',
     'ompsnm',
 ]
 
@@ -1831,7 +1831,11 @@ class Ozone(BaseGSI):
         # ioda_conv_ncio or equivalent to handle the format
 
         # set up output file
-        outname = OutDir+'/'+self.sensor+'_'+self.satellite+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc'
+        # Map sensor names for output file naming
+        sensor_out = self.sensor
+        if self.sensor == 'ompstc8':
+            sensor_out = 'ompstc'
+        outname = OutDir+'/'+sensor_out+'_'+self.satellite+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
@@ -1899,7 +1903,11 @@ class Ozone(BaseGSI):
         else:
             diagtype = "_obs_"
             varsuffix = ""
-        outname = OutDir + '/retrieval_ozone_' + self.sensor + '_' + self.satellite + diagtype + self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
+        # Map sensor names for output file naming
+        sensor_out = self.sensor
+        if self.sensor == 'ompstc8':
+            sensor_out = 'ompstc'
+        outname = OutDir + '/retrieval_ozone_' + sensor_out + '_' + self.satellite + diagtype + self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
