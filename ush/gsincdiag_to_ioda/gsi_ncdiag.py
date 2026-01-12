@@ -1831,7 +1831,11 @@ class Ozone(BaseGSI):
         # ioda_conv_ncio or equivalent to handle the format
 
         # set up output file
-        outname = OutDir+'/'+self.sensor+'_'+self.satellite+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc'
+        # Map sensor names for output file naming
+        sensor_out = self.sensor
+        if self.sensor == 'ompstc8':
+            sensor_out = 'ompstc'
+        outname = OutDir+'/'+sensor_out+'_'+self.satellite+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
@@ -1899,7 +1903,11 @@ class Ozone(BaseGSI):
         else:
             diagtype = "_obs_"
             varsuffix = ""
-        outname = OutDir + '/retrieval_ozone_' + self.sensor + '_' + self.satellite + diagtype + self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
+        # Map sensor names for output file naming
+        sensor_out = self.sensor
+        if self.sensor == 'ompstc8':
+            sensor_out = 'ompstc'
+        outname = OutDir + '/retrieval_ozone_' + sensor_out + '_' + self.satellite + diagtype + self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
@@ -1959,6 +1967,22 @@ class Ozone(BaseGSI):
                 if loc_mdata_name in units_values.keys():
                     varAttrs[(loc_mdata_name, 'MetaData')]['units'] = units_values[loc_mdata_name]
             self.VarDims[(loc_mdata_name, 'MetaData')] = ['Location']
+
+        # For ompsnp sensor, create 2D pressureVertice variable from bottom and top level pressures
+        if self.sensor == 'ompsnp':
+            # Check if both pressure variables exist in the output data
+            if ('bottom_level_pressure', 'MetaData') in outdata and ('top_level_pressure', 'MetaData') in outdata:
+                # Create 2D array with dimensions (Location, 2)
+                bottom_pressure = outdata[('bottom_level_pressure', 'MetaData')]
+                top_pressure = outdata[('top_level_pressure', 'MetaData')]
+                # Stack them as columns: first column is top, second is bottom
+                pressure_vertices = np.column_stack([top_pressure, bottom_pressure])
+                outdata[('pressureVertice', 'RetrievalAncillaryData')] = pressure_vertices
+                self.VarDims[('pressureVertice', 'RetrievalAncillaryData')] = ['Location', 'Vertices']
+                varAttrs[('pressureVertice', 'RetrievalAncillaryData')]['units'] = 'Pa'
+                varAttrs[('pressureVertice', 'RetrievalAncillaryData')]['_FillValue'] = self.FLOAT_FILL
+                # Add Vertices dimension to DimDict
+                self.DimDict['Vertices'] = 2
 
         for gsivar, iodavar in gsi_add_vars.items():
             # some special actions need to be taken depending on var name...
