@@ -1960,6 +1960,21 @@ class Ozone(BaseGSI):
                     varAttrs[(loc_mdata_name, 'MetaData')]['units'] = units_values[loc_mdata_name]
             self.VarDims[(loc_mdata_name, 'MetaData')] = ['Location']
 
+        # For ompsnp sensor, create 2D pressureVertice variable from bottom and top level pressures
+        if self.sensor == 'ompsnp':
+            # Check if both pressure variables exist in the output data
+            if ('bottom_level_pressure', 'MetaData') in outdata and ('top_level_pressure', 'MetaData') in outdata:
+                # Create 2D array with dimensions (Location, 2)
+                bottom_pressure = outdata[('bottom_level_pressure', 'MetaData')]
+                top_pressure = outdata[('top_level_pressure', 'MetaData')]
+                # Stack them as columns: first column is bottom, second is top
+                pressure_vertices = np.column_stack([bottom_pressure, top_pressure])
+                outdata[('pressureVertice', 'RetrievalAncillaryData')] = pressure_vertices
+                self.VarDims[('pressureVertice', 'RetrievalAncillaryData')] = ['Location', 'Vertices']
+                varAttrs[('pressureVertice', 'RetrievalAncillaryData')]['units'] = 'Pa'
+                # Add Vertices dimension to DimDict
+                self.DimDict['Vertices'] = 2
+
         for gsivar, iodavar in gsi_add_vars.items():
             # some special actions need to be taken depending on var name...
             if gsivar in self.df.variables:
