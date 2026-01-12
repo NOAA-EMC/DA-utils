@@ -516,7 +516,7 @@ oz_lay_sensors = [
     'sbuv2',
     'omi',
     'ompsnp',
-    'ompstc8',
+    'ompstc',
     'ompsnm',
 ]
 
@@ -1967,8 +1967,8 @@ class Ozone(BaseGSI):
                 # Create 2D array with dimensions (Location, 2)
                 bottom_pressure = outdata[('bottom_level_pressure', 'MetaData')]
                 top_pressure = outdata[('top_level_pressure', 'MetaData')]
-                # Stack them as columns: first column is bottom, second is top
-                pressure_vertices = np.column_stack([bottom_pressure, top_pressure])
+                # Stack them as columns: first column is top, second is bottom
+                pressure_vertices = np.column_stack([top_pressure, bottom_pressure])
                 outdata[('pressureVertice', 'RetrievalAncillaryData')] = pressure_vertices
                 self.VarDims[('pressureVertice', 'RetrievalAncillaryData')] = ['Location', 'Vertices']
                 varAttrs[('pressureVertice', 'RetrievalAncillaryData')]['units'] = 'Pa'
