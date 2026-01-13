@@ -994,7 +994,9 @@ class Conv(BaseGSI):
                         # All original observation errors are saved as "Error_Input". J.Jin 10/24/2022.
                         obserr = self.var('Error_Input')[idx]
                     except BaseException:
-                        obserr = self.var('Errinv_Input')[idx]
+                        #obserr = self.var('Errinv_Input')[idx]
+                        # for direct use of GSI errors and QC, let us save the final errors instead
+                        obserr = self.var('Errinv_Final')[idx]
                         mask = obserr < self.EPSILON
                         obserr[~mask] = 1.0 / obserr[~mask]
                         # below is a temporary hack until missing ObsError support returns to IODA/UFO
@@ -1516,8 +1518,13 @@ class Radiances(BaseGSI):
         try:
             obserr = self.var('Input_Observation_Error').astype(np.float32)
         except IndexError:
-            # obserr = 1./self.var('Inverse_Observation_Error')
-            obserr = np.repeat(self.var('error_variance').astype(np.float32), nlocs, axis=0)
+            inv_obserr = self.var('Inverse_Observation_Error').astype(np.float32)
+            # Safely invert inverse observation error, avoiding division by zero and infinities
+            obserr = np.full(inv_obserr.shape, self.FLOAT_FILL, dtype=np.float32)
+            valid_mask = np.isfinite(inv_obserr) & (np.abs(inv_obserr) > 0.0)
+            obserr[valid_mask] = 1.0 / inv_obserr[valid_mask]
+            # use final obs error directly from GSI
+            #obserr = np.repeat(self.var('error_variance').astype(np.float32), nlocs, axis=0)
         # obserr[:] = self.FLOAT_FILL  # commented this line so the obserr stores initial obs error
         obsqc = self.var('QC_Flag').astype(np.int32)
         if (ObsBias):
@@ -1943,10 +1950,10 @@ class Ozone(BaseGSI):
 
         obsdata = self.var('Observation')
         try:
-            tmp = self.var('Input_Observation_Error')
+            tmp = 1./self.var('Inverse_Observation_Error')
         except IndexError:
             try:
-                tmp = 1./self.var('Inverse_Observation_Error')
+                tmp = self.var('Input_Observation_Error')
             except IndexError:
                 tmp = np.repeat(self.var('error_variance'), nlocs, axis=0)
         tmp[tmp < self.EPSILON] = 0
