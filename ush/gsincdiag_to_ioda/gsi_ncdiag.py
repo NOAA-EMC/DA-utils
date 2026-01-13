@@ -1518,7 +1518,11 @@ class Radiances(BaseGSI):
         try:
             obserr = self.var('Input_Observation_Error').astype(np.float32)
         except IndexError:
-            obserr = 1./self.var('Inverse_Observation_Error')
+            inv_obserr = self.var('Inverse_Observation_Error').astype(np.float32)
+            # Safely invert inverse observation error, avoiding division by zero and infinities
+            obserr = np.full(inv_obserr.shape, self.FLOAT_FILL, dtype=np.float32)
+            valid_mask = np.isfinite(inv_obserr) & (np.abs(inv_obserr) > 0.0)
+            obserr[valid_mask] = 1.0 / inv_obserr[valid_mask]
             # use final obs error directly from GSI
             #obserr = np.repeat(self.var('error_variance').astype(np.float32), nlocs, axis=0)
         # obserr[:] = self.FLOAT_FILL  # commented this line so the obserr stores initial obs error
