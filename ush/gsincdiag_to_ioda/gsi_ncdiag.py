@@ -1003,7 +1003,6 @@ class Conv(BaseGSI):
                         obserr[mask] = 1e8
                         # obserr[mask] = self.FLOAT_FILL
                         # obserr[obserr > 4e8] = self.FLOAT_FILL
-            
                     # convert surface_pressure error to Pa from hPa
 
                     if v == 'ps' and np.nanmin(obserr) < 10:
