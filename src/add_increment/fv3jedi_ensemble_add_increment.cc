@@ -7,6 +7,6 @@
 
 int main(int argc,  char ** argv) {
   oops::Run run(argc, argv);
-  oops::EnsembleApplication<gdasapp::AddIncrement<fv3jedi::Traits>> addIncrement;
+  oops::EnsembleApplication<dautils::AddIncrement<fv3jedi::Traits>> addIncrement;
   return run.execute(addIncrement);
 }

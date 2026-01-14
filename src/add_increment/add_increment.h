@@ -22,7 +22,7 @@
 #include "oops/util/Duration.h"
 #include "oops/util/Logger.h"
 
-namespace gdasapp {
+namespace dautils {
 
 /// Application that adds an increment to a state and writes the sum to a file.
 ///
@@ -110,7 +110,7 @@ template <typename MODEL> class AddIncrement : public oops::Application {
 // -----------------------------------------------------------------------------
  private:
   std::string appname() const override {
-    return "gdasapp::AddIncrement<" + MODEL::name() + ">";
+    return "dautils::AddIncrement<" + MODEL::name() + ">";
   }
 // -----------------------------------------------------------------------------
 };
