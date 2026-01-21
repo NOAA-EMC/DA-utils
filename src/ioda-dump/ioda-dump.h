@@ -305,11 +305,6 @@ namespace dautils {
            std::string base = filename.substr(0, filename.find_last_of('.'));
            std::string instrument = base.substr(base.find_last_of("/\\") + 1);
 
-	   if (sharedPath.empty()) {
-              oops::Log::error() << "No shared path available for file " << filename << std::endl;
-              throw eckit::Exception("Shared path not available");
-           }
-
            std::string yamlDir = sharedPath[0];
 	   std::string queryFile;
 	   if (queryPrefix.empty()) {
