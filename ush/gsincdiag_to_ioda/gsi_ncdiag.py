@@ -994,7 +994,9 @@ class Conv(BaseGSI):
                         # All original observation errors are saved as "Error_Input". J.Jin 10/24/2022.
                         obserr = self.var('Error_Input')[idx]
                     except BaseException:
-                        obserr = self.var('Errinv_Input')[idx]
+                        #obserr = self.var('Errinv_Input')[idx]
+                        # for direct use of GSI errors and QC, let us save the final errors instead
+                        obserr = self.var('Errinv_Final')[idx]
                         mask = obserr < self.EPSILON
                         obserr[~mask] = 1.0 / obserr[~mask]
                         # below is a temporary hack until missing ObsError support returns to IODA/UFO
@@ -1516,8 +1518,13 @@ class Radiances(BaseGSI):
         try:
             obserr = self.var('Input_Observation_Error').astype(np.float32)
         except IndexError:
-            # obserr = 1./self.var('Inverse_Observation_Error')
-            obserr = np.repeat(self.var('error_variance').astype(np.float32), nlocs, axis=0)
+            inv_obserr = self.var('Inverse_Observation_Error').astype(np.float32)
+            # Safely invert inverse observation error, avoiding division by zero and infinities
+            obserr = np.full(inv_obserr.shape, self.FLOAT_FILL, dtype=np.float32)
+            valid_mask = np.isfinite(inv_obserr) & (np.abs(inv_obserr) > 0.0)
+            obserr[valid_mask] = 1.0 / inv_obserr[valid_mask]
+            # use final obs error directly from GSI
+            #obserr = np.repeat(self.var('error_variance').astype(np.float32), nlocs, axis=0)
         # obserr[:] = self.FLOAT_FILL  # commented this line so the obserr stores initial obs error
         obsqc = self.var('QC_Flag').astype(np.int32)
         if (ObsBias):
@@ -1836,7 +1843,11 @@ class Ozone(BaseGSI):
         # ioda_conv_ncio or equivalent to handle the format
 
         # set up output file
-        outname = OutDir+'/'+self.sensor+'_'+self.satellite+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc'
+        # Map sensor names for output file naming
+        sensor_out = self.sensor
+        if self.sensor == 'ompstc8':
+            sensor_out = 'ompstc'
+        outname = OutDir+'/'+sensor_out+'_'+self.satellite+'_geoval_'+self.validtime.strftime("%Y%m%d%H")+'.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
@@ -1904,7 +1915,11 @@ class Ozone(BaseGSI):
         else:
             diagtype = "_obs_"
             varsuffix = ""
-        outname = OutDir + '/retrieval_ozone_' + self.sensor + '_' + self.satellite + diagtype + self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
+        # Map sensor names for output file naming
+        sensor_out = self.sensor
+        if self.sensor == 'ompstc8':
+            sensor_out = 'ompstc'
+        outname = OutDir + '/retrieval_ozone_' + sensor_out + '_' + self.satellite + diagtype + self.validtime.strftime("%Y%m%d%H") + '.gsi.nc'
         if not clobber:
             if (os.path.exists(outname)):
                 print("File exists. Skipping and not overwriting: %s" % outname)
@@ -1925,6 +1940,8 @@ class Ozone(BaseGSI):
         vname = "ozoneProfile"
         if (self.sensor in oz_lay_sensors):
             vname = "ozoneTotal"
+        if (self.sensor == 'ompsnp'):
+            vname = "ozoneLayer"
         varDict[vname]['valKey'] = vname, iconv.OvalName()
         varDict[vname]['errKey'] = vname, iconv.OerrName()
         varDict[vname]['qcKey'] = vname, iconv.OqcName()
@@ -1938,10 +1955,10 @@ class Ozone(BaseGSI):
 
         obsdata = self.var('Observation')
         try:
-            tmp = self.var('Input_Observation_Error')
+            tmp = 1./self.var('Inverse_Observation_Error')
         except IndexError:
             try:
-                tmp = 1./self.var('Inverse_Observation_Error')
+                tmp = self.var('Input_Observation_Error')
             except IndexError:
                 tmp = np.repeat(self.var('error_variance'), nlocs, axis=0)
         tmp[tmp < self.EPSILON] = 0
@@ -1964,6 +1981,22 @@ class Ozone(BaseGSI):
                 if loc_mdata_name in units_values.keys():
                     varAttrs[(loc_mdata_name, 'MetaData')]['units'] = units_values[loc_mdata_name]
             self.VarDims[(loc_mdata_name, 'MetaData')] = ['Location']
+
+        # For ompsnp sensor, create 2D pressureVertice variable from bottom and top level pressures
+        if self.sensor == 'ompsnp':
+            # Check if both pressure variables exist in the output data
+            if ('bottom_level_pressure', 'MetaData') in outdata and ('top_level_pressure', 'MetaData') in outdata:
+                # Create 2D array with dimensions (Location, 2)
+                bottom_pressure = outdata[('bottom_level_pressure', 'MetaData')]
+                top_pressure = outdata[('top_level_pressure', 'MetaData')]
+                # Stack them as columns: first column is top, second is bottom
+                pressure_vertices = np.column_stack([top_pressure, bottom_pressure])
+                outdata[('pressureVertice', 'RetrievalAncillaryData')] = pressure_vertices
+                self.VarDims[('pressureVertice', 'RetrievalAncillaryData')] = ['Location', 'Vertices']
+                varAttrs[('pressureVertice', 'RetrievalAncillaryData')]['units'] = 'Pa'
+                varAttrs[('pressureVertice', 'RetrievalAncillaryData')]['_FillValue'] = self.FLOAT_FILL
+                # Add Vertices dimension to DimDict
+                self.DimDict['Vertices'] = 2
 
         for gsivar, iodavar in gsi_add_vars.items():
             # some special actions need to be taken depending on var name...
