@@ -84,7 +84,9 @@ namespace dautils {
          fullConfig.get("shared path", sharedPath);
          oops::Log::info() << "Shared Path: " << sharedPath << std::endl;
       } else {
-	 throw eckit::Exception("Missing 'Shared Path' in YAML configuration");
+         // Use default value and print warning
+         sharedPath.push_back("./");
+         oops::Log::warning() << "Shared Path not defined in YAML configuration, using default: './' " << std::endl;
       }
 
       // get "query prefix" for mapping and query files
