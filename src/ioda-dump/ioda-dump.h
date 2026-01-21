@@ -84,7 +84,9 @@ namespace dautils {
          fullConfig.get("shared path", sharedPath);
          oops::Log::info() << "Shared Path: " << sharedPath << std::endl;
       } else {
-	 throw eckit::Exception("Missing 'Shared Path' in YAML configuration");
+         // Use default value and print warning
+         sharedPath.push_back("./");
+         oops::Log::warning() << "Shared Path not defined in YAML configuration, using default: './' " << std::endl;
       }
 
       // get "query prefix" for mapping and query files
@@ -302,11 +304,6 @@ namespace dautils {
            // Extract instrument name from filename
            std::string base = filename.substr(0, filename.find_last_of('.'));
            std::string instrument = base.substr(base.find_last_of("/\\") + 1);
-
-	   if (sharedPath.empty()) {
-              oops::Log::error() << "No shared path available for file " << filename << std::endl;
-              throw eckit::Exception("Shared path not available");
-           }
 
            std::string yamlDir = sharedPath[0];
 	   std::string queryFile;

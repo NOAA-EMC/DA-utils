@@ -51,6 +51,11 @@ The program reads a single YAML file. Required keys:
   - `input files`: list of explicit file paths
 - `output file`: path to the ASCII report to write (ensure the directory exists)
 
+Optional keys:
+
+- `shared path`: path to directory containing mapping and query files for ODB files (defaults to `./` if not specified)
+- `query prefix`: prefix for query files used with ODB files
+
 ### Example: directory scan mode
 
 ```yaml
@@ -64,6 +69,7 @@ time window:
 # Scan a directory (non-recursive). Files with extensions .nc, .nc4, .h5, .hdf5, .odb are included.
 input directory: /path/to/ioda/files
 
+# Optional: only required for ODB files. Defaults to './' if not specified.
 shared path: [/path/to/ioda/shared/yaml]
 query prefix: [iodatest_odb_]
 
@@ -95,6 +101,7 @@ input files:
   - /data/ioda/sst/file3.nc4
   - /data/ioda/sst/file4.odb
 
+# Optional: only required for ODB files. Defaults to './' if not specified.
 shared path: [/path/to/ioda/shared/yaml]
 query prefix: [iodatest_odb_]
 
