@@ -18,6 +18,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules)
 
 find_package(NetCDF REQUIRED COMPONENTS CXX Fortran)
 find_package(oops)
+find_package(fv3jedi)
 find_package(MPI REQUIRED Fortran)
 
 add_subdirectory( src )
