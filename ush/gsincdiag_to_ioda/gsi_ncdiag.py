@@ -1594,11 +1594,16 @@ class Radiances(BaseGSI):
                 # outdata[(loc_mdata_name, 'MetaData')] = tmp
                 # if loc_mdata_name in units_values.keys():
                 #     varAttrs[(loc_mdata_name, 'MetaData')]['units'] = units_values[loc_mdata_name]
+
+            # For SSMIS "Sat_Azimuth_Angle" actually contains the "satelliteAscendingFlag".  So populate the latter and 
+            # set "sensorAzimuthAngle" to zero (it needs to be defined but is not used)
             elif self.sensor == "ssmis" and lvar == "Sat_Azimuth_Angle":
                 tmp = self.var(lvar)[::nchans].astype(np.int32)
                 tmp[tmp > 4e8] = self.INT_FILL
                 outdata[("satelliteAscendingFlag", 'MetaData')] = tmp
                 varAttrs[("satelliteAscendingFlag", 'MetaData')]['_FillValue'] = self.INT_FILL
+                outdata[("sensorAzimuthAngle", "MetaData")] = np.zeros(tmp.shape, dtype=np.float32)
+                varAttrs[("sensorAzimuthAngle", "MetaData")]["_FillValue"] = np.float32(self.FLOAT_FILL)                
             else:
                 if dtype == 'integer':
                     tmp = self.var(lvar)[::nchans].astype(np.int32)
