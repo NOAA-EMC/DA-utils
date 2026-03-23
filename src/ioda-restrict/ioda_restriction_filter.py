@@ -12,7 +12,7 @@ OBS_DIM = "Location"
 
 
 # ----------------------------------------------------------------------
-# Compress consecutive index ranges
+# Compress consecutive index ranges (used only in exprsrd mode)
 # ----------------------------------------------------------------------
 def compress_ranges(idx_list):
     if not idx_list:
@@ -36,11 +36,12 @@ def compress_ranges(idx_list):
 
 
 # ----------------------------------------------------------------------
-# Copy groups with optional mask
+# Recursively copy groups and variables
 # ----------------------------------------------------------------------
 def copy_group(in_group, out_group, mask):
     for var_name, var_in in in_group.variables.items():
         fill_value = getattr(var_in, "_FillValue", None)
+
         if fill_value is not None:
             var_out = out_group.createVariable(
                 var_name, var_in.dtype, var_in.dimensions, fill_value=fill_value
@@ -78,17 +79,20 @@ def copy_entire_file(nc_in, outfile):
     with Dataset(outfile, "w") as nc_out:
         for attr in nc_in.ncattrs():
             setattr(nc_out, attr, getattr(nc_in, attr))
+
         for dim_name, dim in nc_in.dimensions.items():
             nc_out.createDimension(
                 dim_name,
                 None if dim.isunlimited() else len(dim)
             )
+
         copy_group(nc_in, nc_out, mask=None)
+
     print(f"  Wrote (unchanged): {outfile}")
 
 
 # ----------------------------------------------------------------------
-# Extract date from path
+# Extract date from path (exprsrd mode)
 # ----------------------------------------------------------------------
 def extract_date_from_path(input_dir):
     prefixes = ["gfs.", "gdas.", "gcdas."]
@@ -101,14 +105,12 @@ def extract_date_from_path(input_dir):
     raise ValueError(f"Could not find gfs., gdas., or gcdas. in path: {input_dir}")
 
 
-# ----------------------------------------------------------------------
-# Build previous (48h earlier) directory
-# ----------------------------------------------------------------------
 def get_prev_48h_dir(input_dir):
     prefix, date_start, date_str = extract_date_from_path(input_dir)
     cur_date = datetime.strptime(date_str, "%Y%m%d")
     prev_date = cur_date - timedelta(hours=48)
     prev_date_str = prev_date.strftime("%Y%m%d")
+
     return (
         input_dir[:date_start]
         + prev_date_str
@@ -117,7 +119,7 @@ def get_prev_48h_dir(input_dir):
 
 
 # ----------------------------------------------------------------------
-# Compute non-restricted mask
+# Compute non-restricted mask (exprsrd mode)
 # ----------------------------------------------------------------------
 def compute_nonrestricted_mask(flag, exp):
     flag = np.ma.array(flag)
@@ -131,13 +133,11 @@ def compute_nonrestricted_mask(flag, exp):
     rsrd_present = ~flag.mask
     expr_present = ~exp.mask
 
-    # Rule 1: missing either (except RSRD present + EXPRSRD missing)
     missing_either = rsrd_missing | expr_missing
     exception_restricted = rsrd_present & expr_missing
     nr_missing = missing_either & ~exception_restricted
     non_restricted |= nr_missing
 
-    # Rule 2: expired (EXPRSRD == 48)
     expired = rsrd_present & expr_present & (exp == 48)
     non_restricted |= expired
 
@@ -145,9 +145,79 @@ def compute_nonrestricted_mask(flag, exp):
 
 
 # ----------------------------------------------------------------------
-# Main processing
+# Mode 1: RSRD filtering (atmos.nr)
 # ----------------------------------------------------------------------
-def process_prev_directory(prev_dir, output_dir):
+def process_rsrd_directory(input_dir, output_dir):
+    print(f"[RSRD] Input directory:  {input_dir}")
+    print(f"[RSRD] Output directory: {output_dir}")
+
+    os.makedirs(output_dir, exist_ok=True)
+    nc_files = sorted(glob.glob(os.path.join(input_dir, "*.nc")))
+
+    if not nc_files:
+        print("[RSRD] No .nc files found.")
+        return
+
+    for infile in nc_files:
+        fname = os.path.basename(infile)
+        outfile = os.path.join(output_dir, fname)
+
+        print(f"\n[RSRD] Processing {fname}")
+
+        with Dataset(infile, "r") as nc_in:
+            loc_dim = nc_in.dimensions.get(OBS_DIM)
+
+            if loc_dim is None or (loc_dim.isunlimited() and len(loc_dim) == 0):
+                print("  No valid Location dimension — copying unchanged.")
+                copy_entire_file(nc_in, outfile)
+                continue
+
+            md = nc_in.groups.get("MetaData", None)
+            if md is None or "restrictionFlag" not in md.variables or "restrictionExpiration" not in md.variables:
+                print("  Missing restriction variables — copying unchanged.")
+                copy_entire_file(nc_in, outfile)
+                continue
+
+            flag = md["restrictionFlag"][:]
+            exp  = md["restrictionExpiration"][:]
+
+            if flag.size == 0 or exp.size == 0:
+                print("  Restriction arrays zero length — copying unchanged.")
+                copy_entire_file(nc_in, outfile)
+                continue
+
+            mask = flag.mask & exp.mask
+
+            total = len(mask)
+            kept = np.sum(mask)
+            dropped = total - kept
+
+            print(f"  Total obs:   {total}")
+            print(f"  Kept obs:    {kept}")
+            print(f"  Dropped obs: {dropped}")
+
+            with Dataset(outfile, "w") as nc_out:
+                for attr in nc_in.ncattrs():
+                    setattr(nc_out, attr, getattr(nc_in, attr))
+
+                for dim_name, dim in nc_in.dimensions.items():
+                    if dim_name == OBS_DIM:
+                        nc_out.createDimension(dim_name, kept)
+                    else:
+                        nc_out.createDimension(
+                            dim_name,
+                            None if dim.isunlimited() else len(dim)
+                        )
+
+                copy_group(nc_in, nc_out, mask)
+
+            print(f"  Wrote: {outfile}")
+
+
+# ----------------------------------------------------------------------
+# Mode 2: EXPRSRD / Non-restricted filtering (atmos.us)
+# ----------------------------------------------------------------------
+def process_exprsrd_directory(prev_dir, output_dir):
     print(f"[NonRestrict] Previous directory: {prev_dir}")
     print(f"[NonRestrict] Output directory:   {output_dir}")
 
@@ -158,16 +228,13 @@ def process_prev_directory(prev_dir, output_dir):
         print("[NonRestrict] No .nc files found.")
         return
 
-    print(f"[NonRestrict] Found {len(nc_files)} NetCDF files.")
-
     for infile in nc_files:
         fname = os.path.basename(infile)
         outfile = os.path.join(output_dir, fname)
 
-        print(f"\n[Processing] {fname}")
+        print(f"\n[NonRestrict] Processing {fname}")
 
         with Dataset(infile, "r") as nc_in:
-
             loc_dim = nc_in.dimensions.get(OBS_DIM)
             if loc_dim is None or (loc_dim.isunlimited() and len(loc_dim) == 0):
                 print("  No valid Location dimension — copying unchanged.")
@@ -175,21 +242,13 @@ def process_prev_directory(prev_dir, output_dir):
                 continue
 
             md = nc_in.groups.get("MetaData", None)
-            if md is None:
-                print("  No MetaData group — copying unchanged.")
-                copy_entire_file(nc_in, outfile)
-                continue
-
-            if "restrictionFlag" not in md.variables or "restrictionExpiration" not in md.variables:
+            if md is None or "restrictionFlag" not in md.variables or "restrictionExpiration" not in md.variables:
                 print("  Missing restriction variables — copying unchanged.")
                 copy_entire_file(nc_in, outfile)
                 continue
 
             flag = md["restrictionFlag"][:]
             exp  = md["restrictionExpiration"][:]
-
-#            print("  restrictionFlag sample:", flag[:10])
-#            print("  restrictionExpiration sample:", exp[:10])
 
             non_restricted_mask = compute_nonrestricted_mask(flag, exp)
             restricted_mask = ~non_restricted_mask
@@ -203,11 +262,7 @@ def process_prev_directory(prev_dir, output_dir):
             print(f"  Non-restricted obs: {kept}")
             print(f"  Restricted obs:     {dropped}")
 
-            # ----------------------------------------------------------
-            # Unique RSRD / EXPRSRD patterns (ONLY diagnostic kept)
-            # ----------------------------------------------------------
             print("  Unique RSRD / EXPRSRD patterns:")
-
             unique_groups = {}
 
             for i in range(len(flag)):
@@ -227,9 +282,6 @@ def process_prev_directory(prev_dir, output_dir):
                 print(f"    RSRD = {ftxt}, EXPRSRD = {etxt}")
                 print(f"      idx ({count}) = {compressed}")
                 print()
-
-
-            # ----------------------------------------------------------
 
             if kept == 0:
                 print("  No non-restricted obs — skipping output.")
@@ -254,24 +306,24 @@ def process_prev_directory(prev_dir, output_dir):
 
 
 # ----------------------------------------------------------------------
-# Main driver
+# Main driver — ALWAYS RUN BOTH FILTERS
 # ----------------------------------------------------------------------
 def main(stats_yaml):
     with open(stats_yaml, "r") as f:
         stats = yaml.safe_load(f)
 
     input_dir = stats["input directory"]
+
+    # --- 1. RSRD filter on current cycle ---
+    output_nr = os.path.join(os.path.dirname(input_dir), "atmos.nr")
+    print("\n=== Running RSRD filter (atmos.nr) ===")
+    process_rsrd_directory(input_dir, output_nr)
+
+    # --- 2. EXPRSRD filter on previous 48h cycle ---
     prev_dir = get_prev_48h_dir(input_dir)
-
-    output_dir = os.path.join(os.path.dirname(prev_dir), "atmos.us")
-    os.makedirs(output_dir, exist_ok=True)
-
-    print(f"[NonRestrict] stats.yaml:   {stats_yaml}")
-    print(f"[NonRestrict] input_dir:    {input_dir}")
-    print(f"[NonRestrict] prev_dir:     {prev_dir}")
-    print(f"[NonRestrict] output_dir:   {output_dir}")
-
-    process_prev_directory(prev_dir, output_dir)
+    output_us = os.path.join(os.path.dirname(prev_dir), "atmos.us")
+    print("\n=== Running EXPRSRD filter (atmos.us) ===")
+    process_exprsrd_directory(prev_dir, output_us)
 
 
 # ----------------------------------------------------------------------
@@ -279,12 +331,11 @@ def main(stats_yaml):
 # ----------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Extract non-restricted observations from previous (48h) IODA NetCDF files"
+        description="Run both RSRD and EXPRSRD filtering for IODA NetCDF files"
     )
-    parser.add_argument(
-        "-s", "--stats", required=True,
-        help="stats.yaml file created by atmos_bufr_prepobs"
-    )
+    parser.add_argument("-s", "--stats", required=True,
+                        help="stats.yaml file created by atmos_bufr_prepobs")
+
     args = parser.parse_args()
     main(args.stats)
 

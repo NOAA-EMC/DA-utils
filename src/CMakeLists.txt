@@ -12,13 +12,10 @@ if ( oops_FOUND )
 endif()
 
 # ----------------------------------------------------------------------
-# copy check_rsrd.py and check_exprsrd.py into build/bin/
+# copy unified restriction script into build/bin/
 # ----------------------------------------------------------------------
 add_custom_target(copy_restriction ALL
         COMMAND ${CMAKE_COMMAND} -E copy
-                ${CMAKE_CURRENT_SOURCE_DIR}/ioda-restrict/check_rsrd.py
-                ${CMAKE_BINARY_DIR}/bin/check_rsrd.py
-        COMMAND ${CMAKE_COMMAND} -E copy
-                ${CMAKE_CURRENT_SOURCE_DIR}/ioda-restrict/check_exprsrd.py
-                ${CMAKE_BINARY_DIR}/bin/check_exprsrd.py
+                ${CMAKE_CURRENT_SOURCE_DIR}/ioda-restrict/ioda_restriction_filter.py
+                ${CMAKE_BINARY_DIR}/bin/ioda_restriction_filter.py
 )
