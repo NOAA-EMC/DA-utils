@@ -6,6 +6,7 @@ import argparse
 import yaml
 import os
 import glob
+import shutil
 from datetime import datetime, timedelta
 
 OBS_DIM = "Location"
@@ -18,7 +19,9 @@ def compress_ranges(idx_list):
     if not idx_list:
         return []
     ranges = []
-    start = prev = idx_list[0]
+    start  = idx_list[0]
+    prev   = idx_list[0]
+
     for x in idx_list[1:]:
         if x == prev + 1:
             prev = x
@@ -27,7 +30,8 @@ def compress_ranges(idx_list):
                 ranges.append(f"{start}")
             else:
                 ranges.append(f"{start}–{prev}")
-            start = prev = x
+            start = x
+            prev  = x
     if start == prev:
         ranges.append(f"{start}")
     else:
@@ -39,6 +43,11 @@ def compress_ranges(idx_list):
 # Recursively copy groups and variables
 # ----------------------------------------------------------------------
 def copy_group(in_group, out_group, mask):
+
+    # Copy group-level attributes
+    for attr in in_group.ncattrs():
+        setattr(out_group, attr, getattr(in_group, attr))
+
     for var_name, var_in in in_group.variables.items():
         fill_value = getattr(var_in, "_FillValue", None)
 
@@ -75,21 +84,9 @@ def copy_group(in_group, out_group, mask):
 # ----------------------------------------------------------------------
 # Copy entire file unchanged
 # ----------------------------------------------------------------------
-def copy_entire_file(nc_in, outfile):
-    with Dataset(outfile, "w") as nc_out:
-        for attr in nc_in.ncattrs():
-            setattr(nc_out, attr, getattr(nc_in, attr))
-
-        for dim_name, dim in nc_in.dimensions.items():
-            nc_out.createDimension(
-                dim_name,
-                None if dim.isunlimited() else len(dim)
-            )
-
-        copy_group(nc_in, nc_out, mask=None)
-
+def copy_entire_file(infile, outfile):
+    shutil.copy(infile, outfile)
     print(f"  Wrote (unchanged): {outfile}")
-
 
 # ----------------------------------------------------------------------
 # Extract date from path (exprsrd mode)
@@ -128,10 +125,10 @@ def compute_nonrestricted_mask(flag, exp):
     n = len(flag)
     non_restricted = np.zeros(n, dtype=bool)
 
-    rsrd_missing = flag.mask
-    expr_missing = exp.mask
-    rsrd_present = ~flag.mask
-    expr_present = ~exp.mask
+    rsrd_missing = np.ma.getmaskarray(flag)
+    expr_missing = np.ma.getmaskarray(exp)
+    rsrd_present = ~rsrd_missing
+    expr_present = ~expr_missing
 
     missing_either = rsrd_missing | expr_missing
     exception_restricted = rsrd_present & expr_missing
@@ -169,13 +166,13 @@ def process_rsrd_directory(input_dir, output_dir):
 
             if loc_dim is None or (loc_dim.isunlimited() and len(loc_dim) == 0):
                 print("  No valid Location dimension — copying unchanged.")
-                copy_entire_file(nc_in, outfile)
+                copy_entire_file(infile, outfile)
                 continue
 
             md = nc_in.groups.get("MetaData", None)
             if md is None or "restrictionFlag" not in md.variables or "restrictionExpiration" not in md.variables:
                 print("  Missing restriction variables — copying unchanged.")
-                copy_entire_file(nc_in, outfile)
+                copy_entire_file(infile, outfile)
                 continue
 
             flag = md["restrictionFlag"][:]
@@ -183,13 +180,15 @@ def process_rsrd_directory(input_dir, output_dir):
 
             if flag.size == 0 or exp.size == 0:
                 print("  Restriction arrays zero length — copying unchanged.")
-                copy_entire_file(nc_in, outfile)
+                copy_entire_file(infile, outfile)
                 continue
 
-            mask = flag.mask & exp.mask
+            flag_mask = np.ma.getmaskarray(flag)
+            exp_mask  = np.ma.getmaskarray(exp)
+            mask = flag_mask & exp_mask
 
-            total = len(mask)
-            kept = np.sum(mask)
+            total = mask.size
+            kept = int(mask.sum())
             dropped = total - kept
 
             print(f"  Total obs:   {total}")
@@ -238,13 +237,13 @@ def process_exprsrd_directory(prev_dir, output_dir):
             loc_dim = nc_in.dimensions.get(OBS_DIM)
             if loc_dim is None or (loc_dim.isunlimited() and len(loc_dim) == 0):
                 print("  No valid Location dimension — copying unchanged.")
-                copy_entire_file(nc_in, outfile)
+                copy_entire_file(infile, outfile)
                 continue
 
             md = nc_in.groups.get("MetaData", None)
             if md is None or "restrictionFlag" not in md.variables or "restrictionExpiration" not in md.variables:
                 print("  Missing restriction variables — copying unchanged.")
-                copy_entire_file(nc_in, outfile)
+                copy_entire_file(infile, outfile)
                 continue
 
             flag = md["restrictionFlag"][:]
@@ -265,9 +264,12 @@ def process_exprsrd_directory(prev_dir, output_dir):
             print("  Unique RSRD / EXPRSRD patterns:")
             unique_groups = {}
 
+            flag_mask = np.ma.getmaskarray(flag)
+            exp_mask  = np.ma.getmaskarray(exp)
+
             for i in range(len(flag)):
-                fval = None if flag.mask[i] else int(flag[i])
-                eval = None if exp.mask[i] else int(exp[i])
+                fval = None if flag_mask[i] else int(flag[i])
+                eval = None if exp_mask[i] else int(exp[i])
                 key = (fval, eval)
                 unique_groups.setdefault(key, []).append(i)
 
