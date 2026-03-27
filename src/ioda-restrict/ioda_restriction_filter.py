@@ -321,12 +321,33 @@ def main(stats_yaml):
     print("\n=== Running RSRD filter (atmos.nr) ===")
     process_rsrd_directory(input_dir, output_nr)
 
-    # --- 2. EXPRSRD filter on previous 48h cycle ---
-    prev_dir = get_prev_48h_dir(input_dir)
-    output_us = os.path.join(os.path.dirname(prev_dir), "atmos.us")
-    print("\n=== Running EXPRSRD filter (atmos.us) ===")
-    process_exprsrd_directory(prev_dir, output_us)
+    # --- Determine whether to run EXPRSRD filter ---
+    # dev_m = current dev machine
+    dev_m = None
+    with open("/lfs/h1/ops/prod/config/prodmachinefile") as f:
+        for line in f:
+            if "backup" in line:
+                parts = line.strip().split(":")
+                if len(parts) >= 2:
+                    dev_m = parts[1]
+                break
 
+    # this_m = dev machine
+    with open("/etc/cluster_name") as f:
+        this_m = f.read().strip()
+
+    print(f"\nCluster check: dev_m={dev_m}, this_m={this_m}")
+
+    run_exprsrd = (dev_m == this_m)
+
+    # --- 2. EXPRSRD filter on previous 48h cycle ---
+    if run_exprsrd:
+        prev_dir = get_prev_48h_dir(input_dir)
+        output_us = os.path.join(os.path.dirname(prev_dir), "atmos.us")
+        print("\n=== Running EXPRSRD filter (atmos.us) ===")
+        process_exprsrd_directory(prev_dir, output_us)
+    else:
+        print("\n=== Skipping EXPRSRD filter (cluster mismatch) ===")
 
 # ----------------------------------------------------------------------
 # Entry point
