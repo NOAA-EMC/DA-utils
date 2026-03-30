@@ -11,7 +11,6 @@ from datetime import datetime, timedelta
 
 OBS_DIM = "Location"
 
-
 # ----------------------------------------------------------------------
 # Compress consecutive index ranges (used only in exprsrd mode)
 # ----------------------------------------------------------------------
@@ -29,15 +28,14 @@ def compress_ranges(idx_list):
             if start == prev:
                 ranges.append(f"{start}")
             else:
-                ranges.append(f"{start}–{prev}")
+                ranges.append(f"{start}-{prev}")
             start = x
             prev  = x
     if start == prev:
         ranges.append(f"{start}")
     else:
-        ranges.append(f"{start}–{prev}")
+        ranges.append(f"{start}-{prev}")
     return ranges
-
 
 # ----------------------------------------------------------------------
 # Recursively copy groups and variables
@@ -80,7 +78,6 @@ def copy_group(in_group, out_group, mask):
         grp_out = out_group.createGroup(grp_name)
         copy_group(grp_in, grp_out, mask)
 
-
 # ----------------------------------------------------------------------
 # Copy entire file unchanged
 # ----------------------------------------------------------------------
@@ -114,7 +111,6 @@ def get_prev_48h_dir(input_dir):
         + input_dir[date_start + 8:]
     )
 
-
 # ----------------------------------------------------------------------
 # Compute non-restricted mask (exprsrd mode)
 # ----------------------------------------------------------------------
@@ -139,7 +135,6 @@ def compute_nonrestricted_mask(flag, exp):
     non_restricted |= expired
 
     return non_restricted
-
 
 # ----------------------------------------------------------------------
 # Mode 1: RSRD filtering (atmos.nr)
@@ -168,24 +163,25 @@ def process_rsrd_directory(input_dir, output_dir):
                 print("  No valid Location dimension — copying unchanged.")
                 copy_entire_file(infile, outfile)
                 continue
-
+            
             md = nc_in.groups.get("MetaData", None)
             if md is None or "restrictionFlag" not in md.variables or "restrictionExpiration" not in md.variables:
-                print("  Missing restriction variables — copying unchanged.")
-                copy_entire_file(infile, outfile)
-                continue
+                print("  Missing restriction variables — writing empty restricted file.")
+                nloc = len(nc_in.dimensions[OBS_DIM])
+                mask = np.zeros(nloc, dtype=bool)
 
-            flag = md["restrictionFlag"][:]
-            exp  = md["restrictionExpiration"][:]
+            else:
+                flag = md["restrictionFlag"][:]
+                exp  = md["restrictionExpiration"][:]
 
-            if flag.size == 0 or exp.size == 0:
-                print("  Restriction arrays zero length — copying unchanged.")
-                copy_entire_file(infile, outfile)
-                continue
-
-            flag_mask = np.ma.getmaskarray(flag)
-            exp_mask  = np.ma.getmaskarray(exp)
-            mask = flag_mask & exp_mask
+                if flag.size == 0 or exp.size == 0:
+                    print("  Restriction arrays zero length — writing empty restricted file.")
+                    nloc = len(nc_in.dimensions[OBS_DIM])
+                    mask = np.zeros(nloc, dtype=bool)
+                else:
+                    flag_mask = np.ma.getmaskarray(flag)
+                    exp_mask  = np.ma.getmaskarray(exp)
+                    mask = flag_mask & exp_mask
 
             total = mask.size
             kept = int(mask.sum())
@@ -196,12 +192,17 @@ def process_rsrd_directory(input_dir, output_dir):
             print(f"  Dropped obs: {dropped}")
 
             with Dataset(outfile, "w") as nc_out:
+
                 for attr in nc_in.ncattrs():
                     setattr(nc_out, attr, getattr(nc_in, attr))
 
                 for dim_name, dim in nc_in.dimensions.items():
                     if dim_name == OBS_DIM:
-                        nc_out.createDimension(dim_name, kept)
+                        # Preserve unlimited-ness
+                        if dim.isunlimited():
+                            nc_out.createDimension(dim_name, None)
+                        else:
+                            nc_out.createDimension(dim_name, kept)
                     else:
                         nc_out.createDimension(
                             dim_name,
@@ -211,7 +212,6 @@ def process_rsrd_directory(input_dir, output_dir):
                 copy_group(nc_in, nc_out, mask)
 
             print(f"  Wrote: {outfile}")
-
 
 # ----------------------------------------------------------------------
 # Mode 2: EXPRSRD / Non-restricted filtering (atmos.us)
@@ -239,52 +239,66 @@ def process_exprsrd_directory(prev_dir, output_dir):
                 print("  No valid Location dimension — copying unchanged.")
                 copy_entire_file(infile, outfile)
                 continue
-
+            
             md = nc_in.groups.get("MetaData", None)
-            if md is None or "restrictionFlag" not in md.variables or "restrictionExpiration" not in md.variables:
-                print("  Missing restriction variables — copying unchanged.")
-                copy_entire_file(infile, outfile)
-                continue
+            nloc = len(nc_in.dimensions[OBS_DIM])
 
-            flag = md["restrictionFlag"][:]
-            exp  = md["restrictionExpiration"][:]
+            # Default: fail-closed empty mask
+            non_restricted_mask = np.zeros(nloc, dtype=bool)
+            kept = 0
 
-            non_restricted_mask = compute_nonrestricted_mask(flag, exp)
-            restricted_mask = ~non_restricted_mask
-            restricted_idx = np.where(restricted_mask)[0]
+            # Fail‑closed: missing MetaData or missing restriction variables ---
+            if (
+                md is None
+                or "restrictionFlag" not in md.variables
+                or "restrictionExpiration" not in md.variables
+            ):
+                print("  Missing restriction variables — writing empty filtered file.")
 
-            total = len(flag)
-            kept = int(np.sum(non_restricted_mask))
-            dropped = total - kept
+            else:
 
-            print(f"  Total obs:          {total}")
-            print(f"  Non-restricted obs: {kept}")
-            print(f"  Restricted obs:     {dropped}")
+                flag = md["restrictionFlag"][:]
+                exp  = md["restrictionExpiration"][:]
 
-            print("  Unique RSRD / EXPRSRD patterns:")
-            unique_groups = {}
+                # Fail‑closed: zero‑length arrays ---
+                if flag.size == 0 or exp.size == 0:
+                    print("  Restriction arrays zero length — writing empty filtered file.")
 
-            flag_mask = np.ma.getmaskarray(flag)
-            exp_mask  = np.ma.getmaskarray(exp)
+                else:
+                    # Normal EXPRSRD filtering ---
+                    non_restricted_mask = compute_nonrestricted_mask(flag, exp)
+                    kept = int(np.sum(non_restricted_mask))
+                    dropped = len(flag) - kept
 
-            for i in range(len(flag)):
-                fval = None if flag_mask[i] else int(flag[i])
-                eval = None if exp_mask[i] else int(exp[i])
-                key = (fval, eval)
-                unique_groups.setdefault(key, []).append(i)
+                    print(f"  Total obs:          {len(flag)}")
+                    print(f"  Non-restricted obs: {kept}")
+                    print(f"  Restricted obs:     {dropped}")
 
-            for (fval, eval), idx_list in unique_groups.items():
-                idx_list_sorted = sorted(idx_list)
-                compressed = compress_ranges(idx_list_sorted)
-                count = len(idx_list_sorted)
+                    print("  Unique RSRD / EXPRSRD patterns:")
+                    unique_groups = {}
 
-                ftxt = fval if fval is not None else "--"
-                etxt = eval if eval is not None else "--"
+                    flag_mask = np.ma.getmaskarray(flag)
+                    exp_mask  = np.ma.getmaskarray(exp)
 
-                print(f"    RSRD = {ftxt}, EXPRSRD = {etxt}")
-                print(f"      idx ({count}) = {compressed}")
-                print()
+                    for i in range(len(flag)):
+                        fval = None if flag_mask[i] else int(flag[i])
+                        eval = None if exp_mask[i] else int(exp[i])
+                        key = (fval, eval)
+                        unique_groups.setdefault(key, []).append(i)
 
+                    for (fval, eval), idx_list in unique_groups.items():
+                        idx_list_sorted = sorted(idx_list)
+                        compressed = compress_ranges(idx_list_sorted)
+                        count = len(idx_list_sorted)
+
+                        ftxt = fval if fval is not None else "--"
+                        etxt = eval if eval is not None else "--"
+
+                        print(f"    RSRD = {ftxt}, EXPRSRD = {etxt}")
+                        print(f"      idx ({count}) = {compressed}")
+                        print()
+
+            # If nothing kept, skip writing
             if kept == 0:
                 print("  No non-restricted obs — skipping output.")
                 continue
@@ -306,9 +320,8 @@ def process_exprsrd_directory(prev_dir, output_dir):
 
             print(f"  Wrote (non-restricted only): {outfile}")
 
-
 # ----------------------------------------------------------------------
-# Main driver — ALWAYS RUN BOTH FILTERS
+# Main driver — RSRD always runs; EXPRSRD runs only on designated dev/backup cluster (WCOSS2)
 # ----------------------------------------------------------------------
 def main(stats_yaml):
     with open(stats_yaml, "r") as f:
@@ -322,23 +335,36 @@ def main(stats_yaml):
     process_rsrd_directory(input_dir, output_nr)
 
     # --- Determine whether to run EXPRSRD filter ---
-    # dev_m = current dev machine
     dev_m = None
-    with open("/lfs/h1/ops/prod/config/prodmachinefile") as f:
-        for line in f:
-            if "backup" in line:
-                parts = line.strip().split(":")
-                if len(parts) >= 2:
-                    dev_m = parts[1]
-                break
+    this_m = None
 
-    # this_m = dev machine
-    with open("/etc/cluster_name") as f:
-        this_m = f.read().strip()
+    # Read designated backup machine
+    try:
+        with open("/lfs/h1/ops/prod/config/prodmachinefile") as f:
+            for line in f:
+                if "backup" in line:
+                    parts = line.strip().split(":")
+                    if len(parts) >= 2:
+                        dev_m = parts[1]
+                    break
+    except (FileNotFoundError, OSError):
+        print("  Cannot read prodmachinefile — skipping EXPRSRD filter.")
 
-    print(f"\nCluster check: dev_m={dev_m}, this_m={this_m}")
+    # Read current cluster name
+    try:
+        with open("/etc/cluster_name") as f:
+            this_m = f.read().strip()
+    except (FileNotFoundError, OSError):
+        print("  Cannot read cluster_name — skipping EXPRSRD filter.")
 
-    run_exprsrd = (dev_m == this_m)
+    # Decide whether EXPRSRD should run
+    if dev_m is None or this_m is None:
+        run_exprsrd = False
+    else:
+        run_exprsrd = (dev_m == this_m)
+
+    print(f"\nCluster check: dev_m={dev_m}, this_m={this_m}, run_exprsrd={run_exprsrd}")
+
 
     # --- 2. EXPRSRD filter on previous 48h cycle ---
     if run_exprsrd:
