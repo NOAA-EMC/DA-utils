@@ -359,7 +359,7 @@ def main(stats_yaml):
 
     # Decide whether EXPRSRD should run
     if dev_m is None or this_m is None:
-        run_exprsrd = False
+        run_exprsrd = True
     else:
         run_exprsrd = (dev_m == this_m)
 
