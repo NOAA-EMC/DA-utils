@@ -166,9 +166,9 @@ def process_rsrd_directory(input_dir, output_dir):
             
             md = nc_in.groups.get("MetaData", None)
             if md is None or "restrictionFlag" not in md.variables or "restrictionExpiration" not in md.variables:
-                print("  Missing restriction variables — writing empty restricted file.")
-                nloc = len(nc_in.dimensions[OBS_DIM])
-                mask = np.zeros(nloc, dtype=bool)
+                print("  Missing restriction variables — copying unchanged.")
+                copy_entire_file(infile, outfile)
+                continue
 
             else:
                 flag = md["restrictionFlag"][:]
@@ -247,20 +247,22 @@ def process_exprsrd_directory(prev_dir, output_dir):
             non_restricted_mask = np.zeros(nloc, dtype=bool)
             kept = 0
 
-            # Fail‑closed: missing MetaData or missing restriction variables ---
+            # Missing MetaData or missing restriction variables
             if (
                 md is None
                 or "restrictionFlag" not in md.variables
                 or "restrictionExpiration" not in md.variables
             ):
-                print("  Missing restriction variables — writing empty filtered file.")
+                print("  Missing restriction variables — copying unchanged.")
+                copy_entire_file(infile, outfile)
+                continue
 
             else:
 
                 flag = md["restrictionFlag"][:]
                 exp  = md["restrictionExpiration"][:]
 
-                # Fail‑closed: zero‑length arrays ---
+                # Fail closed: zero‑length arrays ---
                 if flag.size == 0 or exp.size == 0:
                     print("  Restriction arrays zero length — writing empty filtered file.")
 
@@ -321,7 +323,7 @@ def process_exprsrd_directory(prev_dir, output_dir):
             print(f"  Wrote (non-restricted only): {outfile}")
 
 # ----------------------------------------------------------------------
-# Main driver — RSRD always runs; EXPRSRD runs only on designated dev/backup cluster (WCOSS2)
+# Main driver — RSRD always runs; EXPRSRD is skipped on the WCOSS2 production cluster.
 # ----------------------------------------------------------------------
 def main(stats_yaml):
     with open(stats_yaml, "r") as f:
@@ -348,14 +350,14 @@ def main(stats_yaml):
                         dev_m = parts[1]
                     break
     except (FileNotFoundError, OSError):
-        print("  Cannot read prodmachinefile — skipping EXPRSRD filter.")
+        print("  Cannot read prodmachinefile.")
 
     # Read current cluster name
     try:
         with open("/etc/cluster_name") as f:
             this_m = f.read().strip()
     except (FileNotFoundError, OSError):
-        print("  Cannot read cluster_name — skipping EXPRSRD filter.")
+        print("  Cannot read cluster_name.")
 
     # Decide whether EXPRSRD should run
     if dev_m is None or this_m is None:
