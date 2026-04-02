@@ -380,13 +380,35 @@ def main(stats_yaml):
 # ----------------------------------------------------------------------
 # Entry point
 # ----------------------------------------------------------------------
-if __name__ == "__main__":
+#if __name__ == "__main__":
+#    parser = argparse.ArgumentParser(
+#        description="Run both RSRD and EXPRSRD filtering for IODA NetCDF files"
+#    )
+#    parser.add_argument("-s", "--stats", required=True,
+#                        help="stats.yaml file created by atmos_bufr_prepobs")
+#
+#    args = parser.parse_args()
+#    main(args.stats)
+
+# ----------------------------------------------------------------------
+# CLI entry point
+# ----------------------------------------------------------------------
+def cli():
     parser = argparse.ArgumentParser(
         description="Run both RSRD and EXPRSRD filtering for IODA NetCDF files"
     )
-    parser.add_argument("-s", "--stats", required=True,
-                        help="stats.yaml file created by atmos_bufr_prepobs")
-
+    parser.add_argument(
+        "-s", "--stats", required=True,
+        help="stats.yaml file created by atmos_bufr_prepobs"
+    )
     args = parser.parse_args()
     main(args.stats)
+
+
+# ----------------------------------------------------------------------
+# Standard Python entry point
+# ----------------------------------------------------------------------
+if __name__ == "__main__":
+    cli()
+
 
