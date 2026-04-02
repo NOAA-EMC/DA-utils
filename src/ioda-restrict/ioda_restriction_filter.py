@@ -378,19 +378,6 @@ def main(stats_yaml):
         print("\n=== Skipping EXPRSRD filter (cluster mismatch) ===")
 
 # ----------------------------------------------------------------------
-# Entry point
-# ----------------------------------------------------------------------
-#if __name__ == "__main__":
-#    parser = argparse.ArgumentParser(
-#        description="Run both RSRD and EXPRSRD filtering for IODA NetCDF files"
-#    )
-#    parser.add_argument("-s", "--stats", required=True,
-#                        help="stats.yaml file created by atmos_bufr_prepobs")
-#
-#    args = parser.parse_args()
-#    main(args.stats)
-
-# ----------------------------------------------------------------------
 # CLI entry point
 # ----------------------------------------------------------------------
 def cli():
