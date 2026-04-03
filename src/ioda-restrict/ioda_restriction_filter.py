@@ -323,9 +323,9 @@ def process_exprsrd_directory(prev_dir, output_dir):
             print(f"  Wrote (non-restricted only): {outfile}")
 
 # ----------------------------------------------------------------------
-# Main driver — RSRD always runs; EXPRSRD is skipped on the WCOSS2 production cluster.
+# Driver logic — RSRD always runs; EXPRSRD is skipped on the WCOSS2 production cluster.
 # ----------------------------------------------------------------------
-def main(stats_yaml):
+def run_rsrd_exprsrd(stats_yaml):
     with open(stats_yaml, "r") as f:
         stats = yaml.safe_load(f)
 
@@ -389,7 +389,7 @@ def cli():
         help="stats.yaml file created by atmos_bufr_prepobs"
     )
     args = parser.parse_args()
-    main(args.stats)
+    run_rsrd_exprsrd(args.stats)
 
 
 # ----------------------------------------------------------------------
