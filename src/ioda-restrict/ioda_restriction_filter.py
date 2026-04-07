@@ -4,6 +4,7 @@ from netCDF4 import Dataset
 import numpy as np
 import argparse
 import yaml
+import grp
 import os
 import glob
 import shutil
@@ -190,6 +191,17 @@ def process_rsrd_directory(input_dir, output_dir):
             print(f"  Total obs:   {total}")
             print(f"  Kept obs:    {kept}")
             print(f"  Dropped obs: {dropped}")
+
+            # If the input file contains restricted data, update permissions in atmos/
+            if dropped > 0:
+                atmos_file = infile  # original file in atmos directory
+                try:
+                    gid = grp.getgrnam("rstprod").gr_gid
+                    os.chown(atmos_file, -1, gid)   # change only group
+                    os.chmod(atmos_file, 0o750)     # chmod 750
+                    print(f"  Marked restricted: chgrp rstprod, chmod 750 → {atmos_file}")
+                except Exception as e:
+                    print(f"  WARNING: Failed to update permissions for {atmos_file}: {e}")
 
             with Dataset(outfile, "w") as nc_out:
 
