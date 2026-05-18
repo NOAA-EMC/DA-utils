@@ -46,16 +46,18 @@ def copy_group(in_group, out_group, mask):
     # Copy group-level attributes
     for attr in in_group.ncattrs():
         setattr(out_group, attr, getattr(in_group, attr))
-    
+
     for var_name, var_in in in_group.variables.items():
         fill_value = getattr(var_in, "_FillValue", None)
 
-        # Determine whether compression is allowed (numeric only)
+        # Determine whether compression is allowed:
+        # - numeric dtype
+        # - non-scalar (HDF5 cannot deflate 0-D variables)
         dtype = var_in.dtype
-        can_compress = (
-            np.issubdtype(dtype, np.integer) or
-            np.issubdtype(dtype, np.floating)
-        )
+        is_numeric = np.issubdtype(dtype, np.integer) or np.issubdtype(dtype, np.floating)
+        has_dims = len(var_in.dimensions) > 0
+
+        can_compress = is_numeric and has_dims
 
         create_kwargs = {}
         if can_compress:
@@ -102,7 +104,7 @@ def copy_group(in_group, out_group, mask):
         copy_group(grp_in, grp_out, mask)
 
 # ----------------------------------------------------------------------
-# link non-restricted files-create symlink
+# non-restricted files are linked by creating a symlink
 # ----------------------------------------------------------------------
 def copy_entire_file(infile, outfile):
     # Remove existing file or symlink if present
@@ -110,11 +112,13 @@ def copy_entire_file(infile, outfile):
         try:
             os.remove(outfile)
         except Exception as e:
-            print(f"  WARNING: Could not remove existing file {outfile}: {e}")
+            raise OSError(f"Could not remove existing file {outfile}") from e
 
-    # Create symlink
-    os.symlink(infile, outfile)
-    print(f"  Linked (unchanged): {outfile} → {infile}")
+    # Create symlink using an absolute target so relative input paths do not
+    # become broken when resolved from the output directory.
+    link_target = os.path.abspath(infile)
+    os.symlink(link_target, outfile)
+    print(f"  Linked (unchanged): {outfile} → {link_target}")
 
 # ----------------------------------------------------------------------
 # Extract date from path (exprsrd mode)
