@@ -50,15 +50,37 @@ def copy_group(in_group, out_group, mask):
     for var_name, var_in in in_group.variables.items():
         fill_value = getattr(var_in, "_FillValue", None)
 
+        # Determine whether compression is allowed:
+        # - numeric dtype
+        # - non-scalar (HDF5 cannot deflate 0-D variables)
+        dtype = var_in.dtype
+        is_numeric = np.issubdtype(dtype, np.integer) or np.issubdtype(dtype, np.floating)
+        has_dims = len(var_in.dimensions) > 0
+
+        can_compress = is_numeric and has_dims
+
+        create_kwargs = {}
+        if can_compress:
+            create_kwargs = dict(zlib=True, complevel=4, shuffle=True)
+
+        # Create output variable
         if fill_value is not None:
             var_out = out_group.createVariable(
-                var_name, var_in.dtype, var_in.dimensions, fill_value=fill_value
+                var_name,
+                dtype,
+                var_in.dimensions,
+                fill_value=fill_value,
+                **create_kwargs
             )
         else:
             var_out = out_group.createVariable(
-                var_name, var_in.dtype, var_in.dimensions
+                var_name,
+                dtype,
+                var_in.dimensions,
+                **create_kwargs
             )
 
+        # Copy data (masked or full)
         data = var_in[:]
 
         if mask is None:
@@ -71,20 +93,32 @@ def copy_group(in_group, out_group, mask):
         else:
             var_out[:] = data
 
+        # Copy attributes
         for attr in var_in.ncattrs():
             if attr != "_FillValue":
                 setattr(var_out, attr, getattr(var_in, attr))
 
+    # Recurse into subgroups
     for grp_name, grp_in in in_group.groups.items():
         grp_out = out_group.createGroup(grp_name)
         copy_group(grp_in, grp_out, mask)
 
 # ----------------------------------------------------------------------
-# Copy entire file unchanged
+# non-restricted files are linked by creating a symlink
 # ----------------------------------------------------------------------
 def copy_entire_file(infile, outfile):
-    shutil.copy(infile, outfile)
-    print(f"  Wrote (unchanged): {outfile}")
+    # Remove existing file or symlink if present
+    if os.path.exists(outfile) or os.path.islink(outfile):
+        try:
+            os.remove(outfile)
+        except Exception as e:
+            raise OSError(f"Could not remove existing file {outfile}") from e
+
+    # Create symlink using an absolute target so relative input paths do not
+    # become broken when resolved from the output directory.
+    link_target = os.path.abspath(infile)
+    os.symlink(link_target, outfile)
+    print(f"  Linked (unchanged): {outfile} → {link_target}")
 
 # ----------------------------------------------------------------------
 # Extract date from path (exprsrd mode)
@@ -379,13 +413,18 @@ def run_rsrd_exprsrd(stats_yaml):
 
     print(f"\nCluster check: dev_m={dev_m}, this_m={this_m}, run_exprsrd={run_exprsrd}")
 
-
     # --- 2. EXPRSRD filter on previous 48h cycle ---
     if run_exprsrd:
         prev_dir = get_prev_48h_dir(input_dir)
-        output_us = os.path.join(os.path.dirname(prev_dir), "atmos.us")
-        print("\n=== Running EXPRSRD filter (atmos.us) ===")
-        process_exprsrd_directory(prev_dir, output_us)
+
+        # Skip if previous directory does not exist or contains no .nc files
+        nc_files = glob.glob(os.path.join(prev_dir, "*.nc"))
+        if (not os.path.isdir(prev_dir)) or (len(nc_files) == 0):
+            print(f"\n=== Skipping EXPRSRD filter (no previous 48h files): {prev_dir} ===")
+        else:
+            output_us = os.path.join(os.path.dirname(prev_dir), "atmos.us")
+            print("\n=== Running EXPRSRD filter (atmos.us) ===")
+            process_exprsrd_directory(prev_dir, output_us)
     else:
         print("\n=== Skipping EXPRSRD filter (cluster mismatch) ===")
 
@@ -409,5 +448,3 @@ def cli():
 # ----------------------------------------------------------------------
 if __name__ == "__main__":
     cli()
-
-
