@@ -469,7 +469,7 @@ namespace dautils {
                 // 1D data (no channels)
                 // 2D data (with channels), get_db() will read all channels into the 1D vector
                 ospace.get_db(group, variable, obsData);
-            } catch (const ioda::Exception& e) {
+            } catch (const eckit::Exception&) {
               oops::Log::info() << "Skipping missing variable: " << group << "/" << variable << std::endl;
               continue; // Skip to the next variable
             }
