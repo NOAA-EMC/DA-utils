@@ -83,7 +83,13 @@ def run_radiances_obsdiag(radfile, outdir):
     print("Time (DIAG) %s: %.3g sec" % (radfile, time.time() - startt))
     return 0
 
-def proc_gsi_ncdiag(ObsDir=False, ObsBias=False, TotalBias=False, QCVars=False, TestRefs=False, DiagDir='./'):
+
+def proc_gsi_ncdiag(ObsDir=False, GeoDir=False, ObsdiagDir=False,
+                    ObsBias=False, TotalBias=False, QCVars=False,
+                    TestRefs=False, DiagDir='./'):
+    convfiles = glob.glob(DiagDir+'/*conv*')
+    radfiles = glob.glob(DiagDir+'/diag*')
+
     # process obs files
     if ObsDir:
         if not Path(ObsDir).is_dir():
@@ -120,6 +126,48 @@ def proc_gsi_ncdiag(ObsDir=False, ObsBias=False, TotalBias=False, QCVars=False, 
                     process = True
             if process:
                 run_oz_obs(radfile, ObsDir, TotalBias=TotalBias)
+
+    # process geovals files
+    if GeoDir:
+        if not Path(GeoDir).is_dir():
+            raise Exception("Geovals dir: '%s' does not exist." % GeoDir)
+
+        for convfile in convfiles:
+            run_conv_geo(convfile, GeoDir)
+
+        for radfile in radfiles:
+            process_rad = False
+            for p in gsid.rad_sensors:
+                if p in radfile.split('/')[-1]:
+                    process_rad = True
+                    break
+            if process_rad:
+                run_radiances_geo(radfile, GeoDir)
+
+        for radfile in radfiles:
+            process_oz = False
+            oz_sensors = gsid.oz_lay_sensors + gsid.oz_lev_sensors
+            for p in oz_sensors:
+                if p in radfile.split('/')[-1]:
+                    process_oz = True
+                    break
+            if process_oz:
+                run_oz_geo(radfile, GeoDir)
+
+    # process obsdiag files
+    if ObsdiagDir:
+        if not Path(ObsdiagDir).is_dir():
+            raise Exception("Obsdiag dir: '%s' does not exist." % ObsdiagDir)
+
+        for radfile in radfiles:
+            process = False
+            for p in gsid.rad_sensors:
+                if p in radfile.split('/')[-1]:
+                    process = True
+                    break
+            if process:
+                run_radiances_obsdiag(radfile, ObsdiagDir)
+
 
 def combine_ges_anl_ioda(ges_ioda_file, anl_ioda_file, out_ioda_file):
     """Combine GSI IODA ges and anl files into one file."""
@@ -237,7 +285,7 @@ if __name__ == "__main__":
     ap.add_argument("-o", "--obs_dir",
                     help="Path to directory to output observations")
     ap.add_argument("-g", "--geovals_dir",
-                    help="Path to directory to output observations")
+                    help="Path to directory to output geovals")
     ap.add_argument("-d", "--obsdiag_dir",
                     help="Path to directory to output observations")
     ap.add_argument("-b", "--add_obsbias", default=False, action='store_true',
@@ -253,6 +301,7 @@ if __name__ == "__main__":
 
     DiagDir = MyArgs.input_dir
 
-    proc_gsi_ncdiag(ObsDir=MyArgs.obs_dir, ObsBias=MyArgs.add_obsbias,
+    proc_gsi_ncdiag(ObsDir=MyArgs.obs_dir, GeoDir=MyArgs.geovals_dir,
+                    ObsdiagDir=MyArgs.obsdiag_dir, ObsBias=MyArgs.add_obsbias,
                     TotalBias=MyArgs.add_total_bias, QCVars=MyArgs.add_qcvars,
                     TestRefs=MyArgs.add_testrefs, DiagDir=DiagDir)
