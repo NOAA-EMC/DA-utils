@@ -96,6 +96,7 @@ wmo_satid = {
     'noaa-20': 225,
     'noaa-21': 226,
     'npp': 224,
+    'metop-sg-a1': 24,
 }
 
 wmo_instid = {
@@ -106,6 +107,7 @@ wmo_instid = {
     'abi': 617,
     'omps': 947,
     'sbuv': 956,
+    'mws': 233,
 }
 
 # LocKeyList = { 'gsiname':('IODAname','dtype')}
@@ -371,6 +373,7 @@ rad_sensors = [
     'saphir',
     'gmi',
     'amsr2',
+    'mws',
 ]
 
 radar_sensors = [
@@ -1452,6 +1455,9 @@ class Radiances(BaseGSI):
         elif self.sensor == "atms":
             test_fields_ = test_fields_allsky
             test_fields_with_channels_ = test_fields_with_channels_allsky
+        elif self.sensor == "mws":
+            test_fields_ = test_fields_allsky
+            test_fields_with_channels_ = test_fields_with_channels_allsky
         else:
             test_fields_ = test_fields
             test_fields_with_channels_ = test_fields_with_channels
@@ -1649,6 +1655,11 @@ class Radiances(BaseGSI):
                 gsi_add_radvars.update(gsi_add_qcvars_allsky)
 
         if self.sensor == "atms":
+            gsi_add_radvars = gsi_add_vars_allsky
+            if (QCVars):
+                gsi_add_radvars.update(gsi_add_qcvars_allsky)
+
+        if self.sensor == "mws":
             gsi_add_radvars = gsi_add_vars_allsky
             if (QCVars):
                 gsi_add_radvars.update(gsi_add_qcvars_allsky)
